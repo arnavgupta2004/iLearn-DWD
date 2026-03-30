@@ -84,6 +84,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 4. Extract text with pdf-parse
+    // Use internal path to skip pdf-parse's test runner (v1.x)
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const pdfParse = require("pdf-parse/lib/pdf-parse");
     const buffer = Buffer.from(await fileBlob.arrayBuffer());

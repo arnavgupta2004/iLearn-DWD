@@ -14,7 +14,7 @@ export default async function FlaggedQuestionsPage() {
   const { data: professorCourses } = await supabase
     .from("courses")
     .select("id")
-    .eq("professor_id", user.id);
+    .eq("prof_id", user.id);
 
   const courseIds = (professorCourses ?? []).map((c) => c.id);
 

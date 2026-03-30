@@ -2,12 +2,11 @@ import { GoogleGenerativeAI, TaskType } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-// gemini-1.5-flash for evaluation / content generation
 export const geminiFlash = genAI.getGenerativeModel({
-  model: "gemini-1.5-flash",
+  model: "gemini-2.0-flash",
 });
 
-// text-embedding-004 (embedding-001 compatible, 768-dim output)
+// text-embedding-004 (768-dim output)
 export const geminiEmbedding = genAI.getGenerativeModel({
   model: "text-embedding-004",
 });

@@ -14,7 +14,7 @@ export default async function AnalyticsPage() {
   const { data: courses } = await supabase
     .from("courses")
     .select("id, name, code")
-    .eq("professor_id", user.id)
+    .eq("prof_id", user.id)
     .order("created_at", { ascending: false });
 
   if (!courses?.length) {

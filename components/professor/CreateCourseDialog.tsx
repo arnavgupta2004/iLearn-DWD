@@ -374,7 +374,7 @@ export default function CreateCourseDialog({ open, onOpenChange, professorId }: 
       const { data: course, error: courseErr } = await supabase
         .from("courses")
         .insert({
-          professor_id: professorId,
+          prof_id: professorId,
           name: finalForm.name,
           code: finalForm.code,
           credits: Number(finalForm.credits) || 0,
@@ -529,6 +529,18 @@ export default function CreateCourseDialog({ open, onOpenChange, professorId }: 
             <p className="text-xs text-gray-400 max-w-sm text-center">
               Supported: text-based PDF syllabi. Scanned/image PDFs are not supported.
             </p>
+
+            <div className="flex items-center gap-2 text-xs text-gray-400">
+              <span>No PDF?</span>
+              <button
+                type="button"
+                onClick={() => { setForm(emptyForm()); setObjectivesText(""); setOutcomesText(""); setStep(2); }}
+                className="font-semibold underline underline-offset-2 hover:text-gray-600 transition-colors"
+                style={{ color: "#1a2b5e" }}
+              >
+                Fill in manually instead →
+              </button>
+            </div>
           </div>
         )}
 

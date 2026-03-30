@@ -13,7 +13,7 @@ export default async function ProfessorCoursesPage() {
   const { data: courses } = await supabase
     .from("courses")
     .select("id, name, code, credits, difficulty_level, enrollments(count)")
-    .eq("professor_id", user.id)
+    .eq("prof_id", user.id)
     .order("created_at", { ascending: false });
 
   return (

@@ -23,7 +23,7 @@ export default async function CourseDetailPage({ params }: Props) {
     .from("courses")
     .select("id, name, code, credits, difficulty_level, faculty_name")
     .eq("id", courseId)
-    .eq("professor_id", user.id)
+    .eq("prof_id", user.id)
     .single();
 
   if (!course) notFound();

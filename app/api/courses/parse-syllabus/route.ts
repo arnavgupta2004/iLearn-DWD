@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Import pdf-parse via lib path to avoid test-file debug issue
+    // Use internal path to skip pdf-parse's test runner (v1.x)
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const pdfParse = require("pdf-parse/lib/pdf-parse");
     const parsed = await pdfParse(buffer);
@@ -93,9 +93,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ data: courseData });
   } catch (err) {
     console.error("[parse-syllabus]", err);
-    const message = err instanceof SyntaxError
-      ? "Gemini returned invalid JSON. Please try again."
-      : "Failed to parse syllabus.";
+    const message =
+      err instanceof SyntaxError
+        ? "Gemini returned invalid JSON — please try again."
+        : err instanceof Error
+        ? err.message
+        : "Failed to parse syllabus.";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

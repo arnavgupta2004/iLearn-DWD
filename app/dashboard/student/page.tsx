@@ -10,15 +10,6 @@ export default async function StudentCoursesPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/auth");
 
-  // Fetch enrolled courses via the enrollments join
-  const { data: enrollments } = await supabase
-    .from("enrollments")
-    .select(
-      "course_id, courses(id, name, code, credits, difficulty_level, faculty_name)"
-    )
-    .eq("student_id", user.id)
-    .order("created_at", { ascending: false });
-
   type CourseRow = {
     id: string;
     name: string;
@@ -28,10 +19,24 @@ export default async function StudentCoursesPage() {
     faculty_name: string | null;
   };
 
-  // Supabase infers the join as array; flatten and cast safely
-  const courses: CourseRow[] = (enrollments ?? [])
-    .flatMap((e) => (Array.isArray(e.courses) ? e.courses : [e.courses]))
-    .filter((c): c is CourseRow => c !== null && typeof c === "object");
+  // Step 1 — get enrolled course IDs
+  const { data: enrollments } = await supabase
+    .from("enrollments")
+    .select("course_id")
+    .eq("student_id", user.id)
+    .order("created_at", { ascending: false });
+
+  const courseIds = (enrollments ?? []).map((e) => e.course_id).filter(Boolean);
+
+  // Step 2 — fetch course details separately (avoids needing a FK relationship)
+  let courses: CourseRow[] = [];
+  if (courseIds.length > 0) {
+    const { data } = await supabase
+      .from("courses")
+      .select("id, name, code, credits, difficulty_level, faculty_name")
+      .in("id", courseIds);
+    courses = (data ?? []) as CourseRow[];
+  }
 
   return (
     <div className="h-full overflow-y-auto p-8">
