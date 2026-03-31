@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { streamText } from "ai";
 import { createGroq } from "@ai-sdk/groq";
-import { retrieveContext } from "@/lib/rag";
+import { retrieveContext, retrieveAllChunks } from "@/lib/rag";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { geminiFlash } from "@/lib/gemini";
 
@@ -36,15 +36,24 @@ function isUncertain(text: string): boolean {
 function buildSystemPrompt(
   courseName: string,
   difficultyLevel: string,
-  context: string
+  context: string,
+  materialNames: string[]
 ): string {
+  const materialsSection = materialNames.length > 0
+    ? `UPLOADED MATERIALS:\n${materialNames.map((n, i) => `${i + 1}. ${n}`).join("\n")}`
+    : "UPLOADED MATERIALS: None yet.";
+
   return `You are an academic AI assistant for "${courseName}" at IIIT Dharwad. \
 Difficulty level: ${difficultyLevel}.
 
-Answer using the COURSE CONTEXT below first. If the context is insufficient, use your general knowledge — extra knowledge beyond the syllabus is always welcome and you should never penalize curiosity. \
-Be thorough, clear, and pedagogically sound. Only express genuine uncertainty when you truly do not know something important.
+${materialsSection}
 
-COURSE CONTEXT:
+IMPORTANT: The COURSE CONTEXT below contains text extracted directly from the uploaded course material files listed above. \
+This IS your access to those files — treat it as the actual file content. Never say you cannot access the files. \
+Answer using the COURSE CONTEXT as your primary source. If the context is insufficient for a question, supplement with your general knowledge. \
+Be thorough, clear, and pedagogically sound.
+
+COURSE CONTEXT (extracted from uploaded files):
 ${context.trim() || "No course materials have been indexed for this course yet."}`;
 }
 
@@ -107,10 +116,31 @@ export async function POST(req: NextRequest) {
     return new Response("No user message found", { status: 400 });
   }
 
-  // ── 1. Retrieve RAG context ───────────────────────────────────────────────
+  // ── 1. Retrieve RAG context + materials list in parallel ─────────────────
+  const BROAD_QUERY_PATTERNS = [
+    /summar/i, /overview/i, /what.*cover/i, /what.*topic/i, /what.*contain/i,
+    /what.*pdf/i, /what.*material/i, /what.*upload/i, /what.*file/i,
+    /explain.*course/i, /about.*course/i, /outline/i, /contents/i,
+  ];
+  const isBroadQuery = BROAD_QUERY_PATTERNS.some((p) => p.test(lastUserMsg.content));
+  const topK = isBroadQuery ? 40 : 12;
+
   let context = "";
+  let materialNames: string[] = [];
   try {
-    context = await retrieveContext(courseId, lastUserMsg.content);
+    const [ragContext, materialsResult] = await Promise.all([
+      isBroadQuery
+        ? retrieveAllChunks(courseId)
+        : retrieveContext(courseId, lastUserMsg.content, topK),
+      supabaseAdmin
+        .from("course_materials")
+        .select("file_name")
+        .eq("course_id", courseId)
+        .eq("indexed", true),
+    ]);
+    context = ragContext;
+    materialNames = (materialsResult.data ?? []).map((m) => m.file_name);
+    console.log(`[RAG] courseId=${courseId} isBroad=${isBroadQuery} contextLen=${context.length} materials=${materialNames}`);
   } catch (e) {
     console.error("[RAG]", e);
   }
@@ -135,8 +165,8 @@ export async function POST(req: NextRequest) {
   const groqProvider = createGroq({ apiKey: process.env.GROQ_API_KEY! });
 
   const result = streamText({
-    model: groqProvider("llama-3.1-8b-instant"),
-    system: buildSystemPrompt(courseName, difficultyLevel, context),
+    model: groqProvider("llama-3.3-70b-versatile"),
+    system: buildSystemPrompt(courseName, difficultyLevel, context, materialNames),
     messages: messages.map((m) => ({ role: m.role, content: m.content })),
     onFinish: async ({ text }) => {
       try {

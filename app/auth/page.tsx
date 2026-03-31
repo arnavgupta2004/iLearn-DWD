@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase";
 
 type Role = "professor" | "student";
@@ -79,57 +80,75 @@ export default function AuthPage() {
   return (
     <div className="min-h-screen flex">
       {/* ── LEFT PANEL ─────────────────────────────────────── */}
-      <div
-        className="hidden lg:flex flex-col justify-between w-[52%] px-16 py-14"
-        style={{ background: "linear-gradient(145deg, #1a2b5e 0%, #243a7a 60%, #1a2b5e 100%)" }}
-      >
-        {/* Logo */}
-        <div className="flex items-center gap-3">
-          <div
-            className="w-10 h-10 rounded-xl flex items-center justify-center font-extrabold text-lg"
-            style={{ background: "#c9a84c", color: "#1a2b5e" }}
-          >
-            E
-          </div>
-          <span className="text-white font-bold text-xl tracking-tight">EduAI</span>
-        </div>
+      <div className="hidden lg:flex flex-col justify-between w-[52%] px-16 py-14 relative overflow-hidden">
+        {/* Campus background image */}
+        <Image
+          src="/iiit_campus.jpeg"
+          alt="IIIT Dharwad Campus"
+          fill
+          className="object-cover object-center"
+          priority
+        />
+        {/* Gradient overlay — dark at top & bottom, slightly transparent in middle */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(160deg, rgba(15,25,60,0.93) 0%, rgba(20,35,80,0.80) 45%, rgba(10,20,55,0.93) 100%)",
+          }}
+        />
 
-        {/* Hero copy */}
-        <div className="space-y-6">
-          <div
-            className="inline-block text-xs font-semibold tracking-widest uppercase px-3 py-1.5 rounded-full"
-            style={{ background: "rgba(201,168,76,0.18)", color: "#c9a84c" }}
-          >
-            Institute of National Importance
+        {/* All content sits above the overlay */}
+        <div className="relative z-10 flex flex-col justify-between h-full">
+          {/* Logo */}
+          <div className="flex items-center gap-3">
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center font-extrabold text-lg shadow-lg"
+              style={{ background: "#c9a84c", color: "#1a2b5e" }}
+            >
+              E
+            </div>
+            <span className="text-white font-bold text-xl tracking-tight">EduAI</span>
           </div>
-          <h1 className="text-5xl font-extrabold text-white leading-tight">
-            The smarter way<br />
-            to <span style={{ color: "#c9a84c" }}>learn & teach</span><br />
-            at IIIT Dharwad.
-          </h1>
-          <p className="text-blue-200 text-lg leading-relaxed max-w-md">
-            AI-powered Q&amp;A, RAG over course materials, automated evaluation,
-            and real-time analytics — built for professors and students alike.
+
+          {/* Hero copy */}
+          <div className="space-y-6">
+            <div
+              className="inline-flex items-center gap-2 text-xs font-semibold tracking-widest uppercase px-3 py-1.5 rounded-full backdrop-blur-sm"
+              style={{ background: "rgba(201,168,76,0.18)", color: "#c9a84c", border: "1px solid rgba(201,168,76,0.3)" }}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              Institute of National Importance
+            </div>
+            <h1 className="text-5xl font-extrabold text-white leading-tight drop-shadow-lg">
+              The smarter way<br />
+              to <span style={{ color: "#c9a84c" }}>learn & teach</span><br />
+              at IIIT Dharwad.
+            </h1>
+            <p className="text-blue-100 text-lg leading-relaxed max-w-md opacity-90">
+              AI-powered Q&amp;A, RAG over course materials, automated evaluation,
+              and real-time analytics — built for professors and students alike.
+            </p>
+
+            {/* Feature pills */}
+            <div className="flex flex-wrap gap-2 pt-2">
+              {["AI Chat Tutor", "Smart Evaluation", "Course RAG", "Progress Analytics"].map((f) => (
+                <span
+                  key={f}
+                  className="text-sm px-3 py-1.5 rounded-full font-medium backdrop-blur-sm"
+                  style={{ background: "rgba(255,255,255,0.10)", color: "#e0e8ff", border: "1px solid rgba(255,255,255,0.15)" }}
+                >
+                  {f}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <p className="text-blue-300 text-sm opacity-70">
+            © {new Date().getFullYear()} IIIT Dharwad. All rights reserved.
           </p>
-
-          {/* Feature pills */}
-          <div className="flex flex-wrap gap-2 pt-2">
-            {["AI Chat Tutor", "Smart Evaluation", "Course RAG", "Progress Analytics"].map((f) => (
-              <span
-                key={f}
-                className="text-sm px-3 py-1.5 rounded-full font-medium"
-                style={{ background: "rgba(255,255,255,0.08)", color: "#e0e8ff" }}
-              >
-                {f}
-              </span>
-            ))}
-          </div>
         </div>
-
-        {/* Footer */}
-        <p className="text-blue-300 text-sm">
-          © {new Date().getFullYear()} IIIT Dharwad. All rights reserved.
-        </p>
       </div>
 
       {/* ── RIGHT PANEL ────────────────────────────────────── */}
