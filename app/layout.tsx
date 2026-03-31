@@ -10,7 +10,7 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "EduAI — IIIT Dharwad",
+  title: "Education @ IIIT Dharwad",
   description: "AI-powered academic platform for IIIT Dharwad",
 };
 
