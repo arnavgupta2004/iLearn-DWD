@@ -113,7 +113,7 @@ export default function AuthPage() {
                 />
               </div>
             </a>
-            <span className="text-white font-bold text-xl tracking-tight">EduAI</span>
+            <span className="text-white font-bold text-xl tracking-tight">IIITDWD Education</span>
           </div>
 
           {/* Hero copy */}
@@ -171,7 +171,7 @@ export default function AuthPage() {
               />
             </div>
           </a>
-          <span className="font-bold text-xl" style={{ color: "#1a2b5e" }}>EduAI</span>
+          <span className="font-bold text-xl" style={{ color: "#1a2b5e" }}>iLearn DWD</span>
         </div>
 
         <div className="w-full max-w-[400px]">
@@ -202,7 +202,7 @@ export default function AuthPage() {
               <h2 className="text-2xl font-extrabold mb-1" style={{ color: "#1a2b5e" }}>
                 Welcome back
               </h2>
-              <p className="text-sm text-gray-500 mb-7">Sign in to your EduAI account.</p>
+              <p className="text-sm text-gray-500 mb-7">Sign in to your account.</p>
 
               <form onSubmit={handleLogin} className="space-y-4">
                 <Field label="Email">
@@ -265,7 +265,7 @@ export default function AuthPage() {
               <h2 className="text-2xl font-extrabold mb-1" style={{ color: "#1a2b5e" }}>
                 Create account
               </h2>
-              <p className="text-sm text-gray-500 mb-7">Join EduAI as a Professor or Student.</p>
+              <p className="text-sm text-gray-500 mb-7">Join as a Professor or Student.</p>
 
               {signupSuccess ? (
                 <div className="text-center py-10 space-y-3">

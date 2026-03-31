@@ -48,7 +48,7 @@ export default function ProfessorSidebar({ fullName }: Props) {
             />
           </div>
           <div>
-            <p className="text-white font-bold text-sm leading-none">EduAI</p>
+            <p className="text-white font-bold text-sm leading-none">iLearn DWD</p>
             <p className="text-[11px] mt-0.5" style={{ color: "#c9a84c" }}>
               Professor Portal
             </p>

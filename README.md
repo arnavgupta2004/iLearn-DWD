@@ -1,10 +1,10 @@
-# EduAI — Academic AI Platform for IIIT Dharwad
+# iLearn DWD — Academic AI Platform for IIIT Dharwad
 
 > The smarter way to learn & teach at IIIT Dharwad.
 
 **Live:** [https://iiitdwd-edu.vercel.app](https://iiitdwd-edu.vercel.app)
 
-EduAI is a full-stack academic platform that brings AI-powered Q&A, RAG over course materials, automated assignment evaluation, and real-time analytics to professors and students at IIIT Dharwad.
+iLearn DWD is a full-stack academic platform that brings AI-powered Q&A, RAG over course materials, automated assignment evaluation, and real-time analytics to professors and students at IIIT Dharwad.
 
 ---
 
