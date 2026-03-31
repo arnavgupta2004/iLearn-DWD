@@ -9,6 +9,7 @@ const NAV = [
   { label: "My Courses", href: "/dashboard/professor", icon: "📚" },
   { label: "Flagged Questions", href: "/dashboard/professor/flagged", icon: "🚩" },
   { label: "Analytics", href: "/dashboard/professor/analytics", icon: "📊" },
+  { label: "Calendar", href: "/dashboard/professor/calendar", icon: "📅" },
 ];
 
 interface Props {
