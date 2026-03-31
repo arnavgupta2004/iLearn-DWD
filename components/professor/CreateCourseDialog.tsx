@@ -385,7 +385,8 @@ export default function CreateCourseDialog({ open, onOpenChange, professorId }: 
           difficulty_level: finalForm.difficulty_level,
           assessment_weights: finalForm.assessment_weights,
           attendance_policy: finalForm.attendance_policy,
-          rubric_criteria: rubric.map(({ id: _, ...rest }) => rest),
+          rubric_criteria: // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          rubric.map(({ id, ...rest }) => rest),
         })
         .select("id")
         .single();
