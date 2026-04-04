@@ -4,7 +4,7 @@
 
 **Live:** [https://iiitdwd-edu.vercel.app](https://iiitdwd-edu.vercel.app)
 
-iLearn DWD is a full-stack academic platform that brings AI-powered Q&A, RAG over course materials, automated assignment evaluation, and real-time analytics to professors and students at IIIT Dharwad.
+iLearn DWD is a full-stack academic platform that brings AI-powered Q&A, RAG over course materials, professor-requested quizzes and assignments, AI learning intelligence, smart calendars, and real-time analytics to professors and students at IIIT Dharwad.
 
 ---
 
@@ -13,17 +13,21 @@ iLearn DWD is a full-stack academic platform that brings AI-powered Q&A, RAG ove
 ### Professor Portal
 - **Course Creation** — Upload a syllabus PDF and Gemini AI automatically extracts course details, units, objectives, and textbooks into an editable form
 - **Material Upload** — Upload PDF, DOCX, or PPTX course materials; content is extracted, chunked, embedded via Gemini, and indexed into pgvector for RAG
-- **Submission Evaluation** — Students submit assignment PDFs; Gemini evaluates against the course rubric and returns structured AI feedback with scores
-- **Grade Confirmation** — Professors review AI feedback, optionally override scores, and confirm final grades
+- **Quiz & Assignment Requests** — Professors can explicitly create on-platform quizzes or request PDF assignment submissions from students
 - **Flagged Questions** — View student questions the AI couldn't answer; reply directly and answers appear in the student's chat history
-- **Analytics** — Per-course student performance table with interaction counts, average AI scores, and top struggle topics
+- **AI Analytics** — Per-course objective completion, theory vs practical skill, weekly momentum, student topic strengths, and personalized support suggestions
+- **Calendar & Scheduling** — Add classes, meetings, office hours, and manage student interview requests in the professor calendar
+- **Page-Specific AI Assistants** — Context-aware chatbots help professors reason about courses, flagged questions, analytics, and calendar items
 
 ### Student Portal
 - **Course Enrollment** — Join courses via course code shared by the professor
 - **AI Chat Tutor** — RAG-augmented chat powered by Groq (LLaMA 3.3 70B); answers are grounded in uploaded course materials
 - **Material Viewer** — Browse and open indexed course materials directly from the course panel
-- **Assignment Submission** — Submit assignment PDFs and receive instant AI feedback before the professor confirms the grade
-- **My Progress** — View struggle topics, class standing percentile, and 14-day chat activity timeline
+- **Professor-Requested Submissions** — Students can submit quizzes and assignment PDFs only after the professor creates the request
+- **My Progress** — AI-generated course-wise progress tracking with objective completion, growth priorities, and personalized improvement guidance
+- **Smart To Do** — Upcoming quizzes and assignment requests are automatically surfaced and prioritized
+- **Calendar & Interviews** — View deadlines, scheduled classes/events, and request interview/discussion slots with professors
+- **Page-Specific AI Assistants** — Dedicated assistants help students with courses, to-do prioritization, progress improvement, and calendar planning
 
 ---
 
@@ -51,21 +55,24 @@ eduai/
 ├── app/
 │   ├── api/
 │   │   ├── analytics/student/     # Student percentile ranking
+│   │   ├── assessments/           # Quiz/assignment creation and submissions
 │   │   ├── chat/                  # RAG-augmented streaming chat (SSE)
+│   │   ├── calendar/              # Calendar events + interview request APIs
 │   │   ├── courses/parse-syllabus/ # Gemini syllabus PDF parser
 │   │   ├── flagged/answer/        # Professor reply to flagged questions
 │   │   ├── materials/upload/      # SSE upload → extract → embed pipeline
-│   │   └── submissions/
-│   │       ├── confirm/           # Professor grade confirmation
-│   │       └── evaluate/          # Gemini PDF evaluation
+│   │   └── page-chat/             # Page-scoped AI assistant API
 │   ├── auth/                      # Login / Signup page
 │   └── dashboard/
 │       ├── professor/             # Professor portal pages
 │       └── student/               # Student portal pages
 ├── components/
 │   ├── professor/                 # Professor UI components
+│   ├── shared/                    # Shared page assistant + calendar components
 │   └── student/                   # Student UI components
 ├── lib/
+│   ├── calendar.ts                # Calendar event shaping helpers
+│   ├── learning-intelligence.ts   # AI progress and analytics inference
 │   ├── gemini.ts                  # Gemini Flash + embedding client
 │   ├── groq.ts                    # Groq client
 │   ├── rag.ts                     # RAG retrieval functions
@@ -214,20 +221,47 @@ create table flagged_questions (
   created_at timestamptz default now()
 );
 
--- Submissions
-create table submissions (
+-- Assessments (single active submission system)
+create table assessments (
   id uuid primary key default gen_random_uuid(),
   course_id uuid references courses(id),
-  student_id uuid references profiles(id),
-  title text,
-  file_path text,
-  status text default 'pending',
-  ai_feedback jsonb,
-  ai_scores jsonb,
-  overall_score float,
-  professor_score float,
-  professor_notes text,
+  prof_id uuid references profiles(id),
+  title text not null,
+  description text,
+  type text not null check (type in ('quiz', 'assignment')),
+  due_date timestamptz,
+  total_marks int default 100,
   created_at timestamptz default now()
+);
+
+create table quiz_questions (
+  id uuid primary key default gen_random_uuid(),
+  assessment_id uuid references assessments(id) on delete cascade,
+  question_number int not null,
+  question_text text not null,
+  question_type text not null check (question_type in ('mcq', 'short_answer')),
+  options text[],
+  correct_answer text,
+  marks int default 1
+);
+
+create table assessment_submissions (
+  id uuid primary key default gen_random_uuid(),
+  assessment_id uuid references assessments(id) on delete cascade,
+  student_id uuid references profiles(id),
+  course_id uuid references courses(id),
+  type text not null check (type in ('quiz', 'assignment')),
+  answers jsonb,
+  file_path text,
+  status text default 'evaluated',
+  ai_score float,
+  total_marks float,
+  ai_feedback text,
+  ai_breakdown jsonb,
+  evaluated_at timestamptz,
+  submitted_at timestamptz default now(),
+  rank int,
+  total_students int
 );
 
 -- Student topic struggles (analytics)
@@ -238,6 +272,35 @@ create table student_topic_struggles (
   topic text,
   count int default 1,
   last_seen_at timestamptz default now()
+);
+
+-- Professor calendar events
+create table calendar_events (
+  id uuid primary key default gen_random_uuid(),
+  prof_id uuid references profiles(id),
+  course_id uuid references courses(id),
+  title text not null,
+  description text,
+  event_type text not null check (event_type in ('class', 'meeting', 'office_hour', 'custom')),
+  start_at timestamptz not null,
+  end_at timestamptz,
+  location text,
+  created_at timestamptz default now()
+);
+
+-- Student interview / discussion requests
+create table interview_requests (
+  id uuid primary key default gen_random_uuid(),
+  course_id uuid references courses(id),
+  prof_id uuid references profiles(id),
+  student_id uuid references profiles(id),
+  title text not null,
+  agenda text,
+  preferred_start timestamptz not null,
+  preferred_end timestamptz,
+  status text not null default 'pending' check (status in ('pending', 'approved', 'declined')),
+  response_note text,
+  created_at timestamptz default now()
 );
 ```
 
