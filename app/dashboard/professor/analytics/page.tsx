@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import AnalyticsClient from "@/components/professor/AnalyticsClient";
 import PageChatbot from "@/components/shared/PageChatbot";
 
+type AssessmentKind = "quiz" | "assignment";
+
 export default async function AnalyticsPage() {
   const supabase = await createClient();
   const {
@@ -87,9 +89,19 @@ export default async function AnalyticsPage() {
   const struggles = strugglesResult.data ?? [];
   const asmSubs = asmSubsResult.data ?? [];
 
-  const assessmentMap: Record<string, { title: string; type: string; course_id: string; total_marks: number }> = {};
+  const assessmentMap: Record<string, {
+    title: string;
+    type: AssessmentKind;
+    course_id: string;
+    total_marks: number;
+  }> = {};
   for (const a of assessments) {
-    assessmentMap[a.id] = { title: a.title, type: a.type, course_id: a.course_id, total_marks: a.total_marks };
+    assessmentMap[a.id] = {
+      title: a.title,
+      type: a.type === "assignment" ? "assignment" : "quiz",
+      course_id: a.course_id,
+      total_marks: a.total_marks,
+    };
   }
 
   const courseData = await Promise.all(courses.map(async (course) => {
