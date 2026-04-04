@@ -449,7 +449,7 @@ function StudentDetailPanel({
 }
 
 export default function AnalyticsClient({ courses }: Props) {
-  const [openCourse, setOpenCourse] = useState<string>(courses[0]?.id ?? "");
+  const [openCourse, setOpenCourse] = useState<string>("");
   const [selectedStudent, setSelectedStudent] = useState<{
     student: Student;
     courseName: string;

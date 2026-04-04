@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase-server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { redirect } from "next/navigation";
 import TodoClient from "@/components/student/TodoClient";
+import PageChatbot from "@/components/shared/PageChatbot";
 
 export default async function TodoPage() {
   const supabase = await createClient();
@@ -88,6 +89,35 @@ export default async function TodoPage() {
         pending={pending}
         completed={completed}
         studentId={user.id}
+      />
+      <PageChatbot
+        scope="student_todo"
+        title="To Do"
+        subtitle="Ask how to prioritize and plan your pending tasks."
+        placeholder="Ask about what to do next..."
+        suggestedPrompts={[
+          "What should I do today first?",
+          "How should I order my pending tasks?",
+          "Which deadline looks most urgent?",
+        ]}
+        context={{
+          studentId: user.id,
+          pending: pending.map((item) => ({
+            title: item.title,
+            type: item.type,
+            due_date: item.due_date,
+            total_marks: item.total_marks,
+            courseName: item.courseName,
+            courseCode: item.courseCode,
+          })),
+          completed: completed.map((item) => ({
+            title: item.title,
+            type: item.type,
+            submitted_at: item.submission?.submitted_at ?? null,
+            courseName: item.courseName,
+            courseCode: item.courseCode,
+          })),
+        }}
       />
     </div>
   );

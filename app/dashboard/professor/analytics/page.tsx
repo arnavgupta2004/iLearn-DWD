@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { generateCourseLearningIntelligence } from "@/lib/learning-intelligence";
 import { redirect } from "next/navigation";
 import AnalyticsClient from "@/components/professor/AnalyticsClient";
+import PageChatbot from "@/components/shared/PageChatbot";
 
 export default async function AnalyticsPage() {
   const supabase = await createClient();
@@ -238,6 +239,39 @@ export default async function AnalyticsPage() {
         Student performance and engagement across your courses
       </p>
       <AnalyticsClient courses={courseData} />
+      <PageChatbot
+        scope="prof_analytics"
+        title="Analytics"
+        subtitle="Ask about class averages, strong students by topic, and course-level performance."
+        placeholder="Ask about analytics..."
+        suggestedPrompts={[
+          "Tell me the class average score in each course.",
+          "Who is the best student for a particular topic?",
+          "Which course needs intervention first?",
+        ]}
+        context={{
+          courses: courseData.map((course) => ({
+            id: course.id,
+            name: course.name,
+            code: course.code,
+            studentCount: course.students.length,
+            objectiveCoverage: course.courseInsights.objectiveCoverage,
+            weeklyTrend: course.courseInsights.weeklyTrend,
+            topicTalentMap: course.topicTalentMap,
+            topStudents: course.students
+              .slice()
+              .sort((a, b) => b.goalProgress - a.goalProgress)
+              .slice(0, 5)
+              .map((student) => ({
+                fullName: student.fullName,
+                goalProgress: student.goalProgress,
+                objectiveCompletion: student.objectiveCompletion,
+                strengths: student.strengths,
+                avgScore: student.avgScore,
+              })),
+          })),
+        }}
+      />
     </div>
   );
 }

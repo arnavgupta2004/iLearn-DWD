@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase-server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { redirect } from "next/navigation";
 import FlaggedQuestionsClient from "@/components/professor/FlaggedQuestionsClient";
+import PageChatbot from "@/components/shared/PageChatbot";
 
 export default async function FlaggedQuestionsPage() {
   const supabase = await createClient();
@@ -67,6 +68,29 @@ export default async function FlaggedQuestionsPage() {
         Questions the AI couldn&apos;t answer — reply to help your students
       </p>
       <FlaggedQuestionsClient questions={questions} />
+      <PageChatbot
+        scope="prof_flagged"
+        title="Flagged Questions"
+        subtitle="Ask which flagged questions matter most and how to prioritize replies."
+        placeholder="Ask about flagged questions..."
+        suggestedPrompts={[
+          "Which flagged questions should I answer first?",
+          "What themes are repeated in these flagged questions?",
+          "Which course needs my attention most?",
+        ]}
+        context={{
+          totalQuestions: questions.length,
+          unanswered: questions.filter((item) => !item.prof_answer).length,
+          questions: questions.map((item) => ({
+            course: item.courses?.name ?? "Course",
+            courseCode: item.courses?.code ?? "",
+            student: item.profiles?.full_name ?? item.profiles?.email ?? "Student",
+            question: item.question,
+            answered: Boolean(item.prof_answer),
+            created_at: item.created_at,
+          })),
+        }}
+      />
     </div>
   );
 }

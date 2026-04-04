@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
 import StudentCoursesGrid from "@/components/student/StudentCoursesGrid";
+import PageChatbot from "@/components/shared/PageChatbot";
 
 export default async function StudentCoursesPage() {
   const supabase = await createClient();
@@ -39,7 +40,28 @@ export default async function StudentCoursesPage() {
 
   return (
     <div className="h-full overflow-y-auto p-8">
+      <h1 className="text-2xl font-extrabold mb-1" style={{ color: "#1a2b5e" }}>
+        My Courses
+      </h1>
+      <p className="text-gray-400 text-sm mb-6">
+        Browse the courses you are enrolled in
+      </p>
       <StudentCoursesGrid courses={courses} studentId={user.id} />
+      <PageChatbot
+        scope="student_courses"
+        title="My Courses"
+        subtitle="Ask about your enrolled courses, teachers, and course matching."
+        placeholder="Ask about your courses..."
+        suggestedPrompts={[
+          "What courses am I enrolled in?",
+          "Which course sounds most related to machine learning?",
+          "Who teaches my courses?",
+        ]}
+        context={{
+          studentId: user.id,
+          courses,
+        }}
+      />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase-admin";
 import { generateStudentLearningProfile } from "@/lib/learning-intelligence";
 import { redirect } from "next/navigation";
 import ProgressClient from "@/components/student/ProgressClient";
+import PageChatbot from "@/components/shared/PageChatbot";
 
 export default async function MyProgressPage() {
   const supabase = await createClient();
@@ -328,6 +329,35 @@ export default async function MyProgressPage() {
           totalAvailable,
           completionRate,
           totalChats: totalChats ?? 0,
+        }}
+      />
+      <PageChatbot
+        scope="student_progress"
+        title="My Progress"
+        subtitle="Ask how to improve your progress, rankings, and subject performance."
+        placeholder="Ask about improving your progress..."
+        suggestedPrompts={[
+          "How can I improve my progress in this subject?",
+          "How can I top the class?",
+          "Which course needs the most attention right now?",
+        ]}
+        context={{
+          percentile,
+          overviewStats: {
+            avgScorePct,
+            bestScorePct,
+            totalDone,
+            totalAvailable,
+            completionRate,
+            totalChats: totalChats ?? 0,
+          },
+          struggles: (struggles ?? []).map((item) => ({
+            topic: item.topic,
+            count: item.count,
+            course_id: item.course_id,
+          })),
+          coursePerformance,
+          learningProfile: studentLearningProfile,
         }}
       />
     </div>

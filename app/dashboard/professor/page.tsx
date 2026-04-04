@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
 import CoursesGrid from "@/components/professor/CoursesGrid";
+import PageChatbot from "@/components/shared/PageChatbot";
 
 export default async function ProfessorCoursesPage() {
   const supabase = await createClient();
@@ -37,6 +38,21 @@ export default async function ProfessorCoursesPage() {
   return (
     <div className="p-8">
       <CoursesGrid courses={courses ?? []} professorId={user.id} />
+      <PageChatbot
+        scope="prof_courses"
+        title="My Courses"
+        subtitle="Ask about your courses, enrollments, and course-level teaching decisions."
+        placeholder="Ask about your courses..."
+        suggestedPrompts={[
+          "How many students are enrolled in each course?",
+          "Which course has the highest enrollment?",
+          "How can I improve teaching in this course list?",
+        ]}
+        context={{
+          professorId: user.id,
+          courses,
+        }}
+      />
     </div>
   );
 }
