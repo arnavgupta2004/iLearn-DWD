@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase-server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { generateCourseLearningIntelligence } from "@/lib/learning-intelligence";
 import { redirect } from "next/navigation";
 import AnalyticsClient from "@/components/professor/AnalyticsClient";
 
@@ -12,7 +13,7 @@ export default async function AnalyticsPage() {
 
   const { data: courses } = await supabase
     .from("courses")
-    .select("id, name, code")
+    .select("id, name, code, objectives, learning_outcomes")
     .eq("prof_id", user.id)
     .order("created_at", { ascending: false });
 
@@ -27,7 +28,7 @@ export default async function AnalyticsPage() {
 
   const courseIds = courses.map((c) => c.id);
 
-  const [enrollmentsResult, chatsResult, submissionsResult, assessmentsResult] =
+  const [enrollmentsResult, chatsResult, submissionsResult, assessmentsResult, unitsResult] =
     await Promise.all([
       supabaseAdmin
         .from("enrollments")
@@ -47,12 +48,18 @@ export default async function AnalyticsPage() {
         .from("assessments")
         .select("id, title, type, course_id, total_marks")
         .in("course_id", courseIds),
+      supabaseAdmin
+        .from("course_units")
+        .select("course_id, title, topics")
+        .in("course_id", courseIds)
+        .order("unit_number"),
     ]);
 
   const enrollments = enrollmentsResult.data ?? [];
   const chats = chatsResult.data ?? [];
   const submissions = submissionsResult.data ?? [];
   const assessments = assessmentsResult.data ?? [];
+  const units = unitsResult.data ?? [];
 
   const studentIds = Array.from(new Set(enrollments.map((e) => e.student_id)));
   const assessmentIds = assessments.map((a) => a.id);
@@ -84,9 +91,15 @@ export default async function AnalyticsPage() {
     assessmentMap[a.id] = { title: a.title, type: a.type, course_id: a.course_id, total_marks: a.total_marks };
   }
 
-  const courseData = courses.map((course) => {
+  const courseData = await Promise.all(courses.map(async (course) => {
     const courseEnrollments = enrollments.filter((e) => e.course_id === course.id);
     const courseAssessments = assessments.filter((a) => a.course_id === course.id);
+    const courseUnits = units
+      .filter((unit) => unit.course_id === course.id)
+      .map((unit) => ({
+        title: unit.title ?? "Unit",
+        topics: Array.isArray(unit.topics) ? unit.topics : [],
+      }));
 
     const students = courseEnrollments.map((e) => {
       const profile = (
@@ -170,6 +183,35 @@ export default async function AnalyticsPage() {
       };
     });
 
+    const intelligence = await generateCourseLearningIntelligence({
+      courseId: course.id,
+      name: course.name,
+      code: course.code,
+      objectives: Array.isArray(course.objectives) ? course.objectives : [],
+      learningOutcomes: Array.isArray(course.learning_outcomes)
+        ? course.learning_outcomes
+        : [],
+      units: courseUnits,
+      students,
+    });
+
+    const enrichedStudents = students.map((student) => {
+      const insight = intelligence.students.find((item) => item.studentId === student.studentId);
+      return {
+        ...student,
+        objectiveCompletion: insight?.objectiveCompletion ?? 0,
+        goalProgress: insight?.goalProgress ?? 0,
+        weeklyMomentum: insight?.weeklyMomentum ?? 0,
+        theoryUnderstanding: insight?.theoryUnderstanding ?? 0,
+        practicalSkill: insight?.practicalSkill ?? 0,
+        strengths: insight?.strengths ?? [],
+        growthTopics: insight?.growthTopics ?? [],
+        recommendedSupport: insight?.recommendedSupport ?? [],
+        bestContributionAreas: insight?.bestContributionAreas ?? [],
+        coachSummary: insight?.coachSummary ?? "",
+      };
+    });
+
     const topicFreq: Record<string, number> = {};
     for (const s of struggles.filter((s) =>
       enrollments.some((e) => e.student_id === s.student_id && e.course_id === course.id)
@@ -180,8 +222,14 @@ export default async function AnalyticsPage() {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10) as [string, number][];
 
-    return { ...course, students, aggregateTopics };
-  });
+    return {
+      ...course,
+      students: enrichedStudents,
+      aggregateTopics,
+      topicTalentMap: intelligence.topicTalentMap,
+      courseInsights: intelligence.courseInsights,
+    };
+  }));
 
   return (
     <div className="h-full overflow-y-auto p-8">

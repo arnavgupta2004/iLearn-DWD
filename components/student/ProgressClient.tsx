@@ -1,8 +1,11 @@
 "use client";
 
+import { useState } from "react";
+
 interface StruggleTopic {
   topic: string;
   count: number;
+  courseId?: string;
 }
 
 interface TimelineDay {
@@ -47,6 +50,25 @@ interface OverviewStats {
   totalChats: number;
 }
 
+interface StudentCourseInsight {
+  courseId: string;
+  objectiveCompletion: number;
+  learningPace: "fast" | "steady" | "needs_support";
+  confidenceLabel: string;
+  currentFocus: string;
+  strengths: string[];
+  supportStrategies: string[];
+}
+
+interface StudentLearningProfile {
+  overallNarrative: string;
+  personalStrengths: string[];
+  growthPriorities: { topic: string; reason: string }[];
+  personalizedPlan: string[];
+  weeklyFocus: string[];
+  courseProgress: StudentCourseInsight[];
+}
+
 interface Props {
   struggles: StruggleTopic[];
   percentile: number;
@@ -54,14 +76,22 @@ interface Props {
   assessmentScores: AssessmentScore[];
   coursePerformance: CoursePerformance[];
   scoreTrend: ScoreTrendItem[];
+  learningProfile: StudentLearningProfile;
   overviewStats: OverviewStats;
 }
 
 function pctColor(p: number) {
   return p >= 80 ? "#16a34a" : p >= 50 ? "#d97706" : "#dc2626";
 }
+
 function pctBg(p: number) {
   return p >= 80 ? "#dcfce7" : p >= 50 ? "#fef3c7" : "#fee2e2";
+}
+
+function paceStyle(pace: StudentCourseInsight["learningPace"]) {
+  if (pace === "fast") return { bg: "#dcfce7", color: "#166534", label: "Fast pace" };
+  if (pace === "steady") return { bg: "#fef3c7", color: "#92400e", label: "Steady pace" };
+  return { bg: "#fee2e2", color: "#991b1b", label: "Needs support" };
 }
 
 export default function ProgressClient({
@@ -70,49 +100,71 @@ export default function ProgressClient({
   timeline,
   assessmentScores,
   coursePerformance,
-  scoreTrend,
+  learningProfile,
   overviewStats,
 }: Props) {
-  const maxTimelineCount = Math.max(...timeline.map((d) => d.count), 1);
+  const [openCourse, setOpenCourse] = useState<string>("");
   const percentileColor =
     percentile >= 70 ? "#16a34a" : percentile >= 40 ? "#d97706" : "#dc2626";
   const percentileLabel =
     percentile >= 70 ? "Top Performer" : percentile >= 40 ? "On Track" : "Needs Attention";
 
-  const CIRC = 251.3;
-  const strokeDash = (percentile / 100) * CIRC;
+  const courseProgressMap = new Map(
+    learningProfile.courseProgress.map((course) => [course.courseId, course])
+  );
 
-  function dayLabel(dateStr: string) {
-    return new Date(dateStr + "T12:00:00").toLocaleDateString("en", { weekday: "short" }).slice(0, 1);
-  }
-  function formatDateFull(dateStr: string) {
-    return new Date(dateStr + "T12:00:00").toLocaleDateString("en", { month: "short", day: "numeric" });
-  }
+  const courses = coursePerformance.map((course) => {
+    const insight = courseProgressMap.get(course.courseId);
+    const courseAssessments = assessmentScores
+      .filter((assessment) => assessment.courseCode === course.courseCode)
+      .sort(
+        (a, b) =>
+          new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime()
+      );
+    const courseStruggles = struggles
+      .filter((item) => item.courseId === course.courseId)
+      .sort((a, b) => b.count - a.count);
 
-  const today = new Date().toISOString().slice(0, 10);
+    return {
+      ...course,
+      insight,
+      assessments: courseAssessments,
+      struggles: courseStruggles,
+    };
+  });
 
   const CARD = "rounded-2xl border p-5";
   const CARD_STYLE = { borderColor: "#e5eaf5", background: "#fafbff" };
 
   return (
-    <div className="space-y-6 max-w-4xl">
-
-      {/* ── Overview Stats ─────────────────────────────────────── */}
+    <div className="space-y-6 max-w-5xl">
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {[
           {
             label: "Avg Score",
             value: overviewStats.avgScorePct !== null ? `${overviewStats.avgScorePct}%` : "—",
-            sub: "across all assessments",
-            color: overviewStats.avgScorePct !== null ? pctColor(overviewStats.avgScorePct) : "#94a3b8",
-            bg: overviewStats.avgScorePct !== null ? pctBg(overviewStats.avgScorePct) : "#f8fafc",
+            sub: "across all courses",
+            color:
+              overviewStats.avgScorePct !== null
+                ? pctColor(overviewStats.avgScorePct)
+                : "#94a3b8",
+            bg:
+              overviewStats.avgScorePct !== null
+                ? pctBg(overviewStats.avgScorePct)
+                : "#f8fafc",
           },
           {
             label: "Best Score",
             value: overviewStats.bestScorePct !== null ? `${overviewStats.bestScorePct}%` : "—",
             sub: "personal best",
-            color: overviewStats.bestScorePct !== null ? pctColor(overviewStats.bestScorePct) : "#94a3b8",
-            bg: overviewStats.bestScorePct !== null ? pctBg(overviewStats.bestScorePct) : "#f8fafc",
+            color:
+              overviewStats.bestScorePct !== null
+                ? pctColor(overviewStats.bestScorePct)
+                : "#94a3b8",
+            bg:
+              overviewStats.bestScorePct !== null
+                ? pctBg(overviewStats.bestScorePct)
+                : "#f8fafc",
           },
           {
             label: "Done",
@@ -124,16 +176,9 @@ export default function ProgressClient({
           {
             label: "Completion",
             value: `${overviewStats.completionRate}%`,
-            sub: "tasks completed",
+            sub: "overall",
             color: pctColor(overviewStats.completionRate),
             bg: pctBg(overviewStats.completionRate),
-          },
-          {
-            label: "Struggle Topics",
-            value: String(struggles.length),
-            sub: "topics to review",
-            color: struggles.length > 5 ? "#b91c1c" : struggles.length > 2 ? "#d97706" : "#15803d",
-            bg: struggles.length > 5 ? "#fee2e2" : struggles.length > 2 ? "#fef3c7" : "#dcfce7",
           },
           {
             label: "AI Chats",
@@ -141,6 +186,13 @@ export default function ProgressClient({
             sub: "questions asked",
             color: "#6d28d9",
             bg: "#ede9fe",
+          },
+          {
+            label: "Standing",
+            value: `${percentile}%`,
+            sub: percentileLabel,
+            color: percentileColor,
+            bg: `${percentileColor}14`,
           },
         ].map((s) => (
           <div
@@ -159,274 +211,319 @@ export default function ProgressClient({
         ))}
       </div>
 
-      {/* ── Score Trend ────────────────────────────────────────── */}
-      {scoreTrend.length > 0 && (
-        <div className={CARD} style={CARD_STYLE}>
-          <h2 className="text-base font-bold mb-0.5" style={{ color: "#1a2b5e" }}>Score Trend</h2>
-          <p className="text-xs text-gray-400 mb-5">Your last {scoreTrend.length} assessment scores</p>
-          <div className="flex items-end gap-2 h-32">
-            {scoreTrend.map((s, i) => {
-              const heightPct = Math.max((s.pct / 100) * 100, 4);
-              const color = pctColor(s.pct);
-              return (
-                <div key={i} className="flex-1 flex flex-col items-center gap-1 group relative">
-                  {/* Tooltip */}
-                  <div className="absolute bottom-full mb-2 hidden group-hover:flex justify-center z-10 pointer-events-none w-max left-1/2 -translate-x-1/2">
-                    <div className="bg-gray-900 text-white text-xs rounded-lg px-2 py-1.5 whitespace-nowrap text-center">
-                      <p className="font-semibold">{s.label}</p>
-                      <p>{s.pct}%</p>
-                    </div>
-                  </div>
-                  <div
-                    className="w-full rounded-t-lg transition-all"
-                    style={{ height: `${heightPct}%`, background: color, opacity: 0.85 }}
-                  />
-                  <span className="text-[9px] text-gray-400 truncate w-full text-center leading-none">
-                    {s.label.slice(0, 6)}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-          {/* Y axis labels */}
-          <div className="flex justify-between mt-1 px-0.5">
-            <span className="text-[10px] text-gray-400">0%</span>
-            <span className="text-[10px] text-gray-400">50%</span>
-            <span className="text-[10px] text-gray-400">100%</span>
-          </div>
-        </div>
-      )}
+      <div className={CARD} style={CARD_STYLE}>
+        <h2 className="text-base font-bold mb-0.5" style={{ color: "#1a2b5e" }}>
+          Your Learning Summary
+        </h2>
+        <p className="text-xs text-gray-400 mb-4">
+          High-level AI view before the course-wise breakdown
+        </p>
+        <p className="text-sm text-gray-600 leading-relaxed">{learningProfile.overallNarrative}</p>
 
-      {/* ── Course Performance ─────────────────────────────────── */}
-      {coursePerformance.length > 0 && (
-        <div className={CARD} style={CARD_STYLE}>
-          <h2 className="text-base font-bold mb-0.5" style={{ color: "#1a2b5e" }}>Course Performance</h2>
-          <p className="text-xs text-gray-400 mb-4">Average score and completion per course</p>
-          <div className="space-y-4">
-            {coursePerformance.map((c) => (
-              <div key={c.courseId}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-                      style={{ background: "rgba(201,168,76,0.15)", color: "#92400e" }}
-                    >
-                      {c.courseCode}
-                    </span>
-                    <span className="text-sm font-semibold" style={{ color: "#1a2b5e" }}>
-                      {c.courseName}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3 text-xs">
-                    <span className="text-gray-400">
-                      {c.submitted}/{c.total} done
-                    </span>
-                    {c.avgPct !== null && (
-                      <span
-                        className="font-bold px-2 py-0.5 rounded-full"
-                        style={{ background: pctBg(c.avgPct), color: pctColor(c.avgPct) }}
-                      >
-                        {c.avgPct}%
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {/* Progress bar */}
-                <div className="h-2 rounded-full overflow-hidden" style={{ background: "#e5eaf5" }}>
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{
-                      width: `${c.total > 0 ? (c.submitted / c.total) * 100 : 0}%`,
-                      background: c.avgPct !== null ? pctColor(c.avgPct) : "#1a2b5e",
-                    }}
-                  />
-                </div>
+        {learningProfile.personalizedPlan.length > 0 && (
+          <div className="grid grid-cols-2 gap-3 mt-4">
+            {learningProfile.personalizedPlan.map((item) => (
+              <div
+                key={item}
+                className="rounded-xl px-3 py-2 text-sm text-gray-600"
+                style={{ background: "#ffffff" }}
+              >
+                {item}
               </div>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* ── Struggle Topics + Class Standing ──────────────────── */}
-      <div className="grid grid-cols-2 gap-6">
-        {/* Struggle Topics */}
-        <div className={CARD} style={CARD_STYLE}>
-          <h2 className="text-base font-bold mb-0.5" style={{ color: "#1a2b5e" }}>Struggle Topics</h2>
-          <p className="text-xs text-gray-400 mb-4">From chats, quizzes &amp; assignments</p>
-          {struggles.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-8">No struggle topics yet. Great work!</p>
-          ) : (
-            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-              {struggles.map((s) => (
-                <div
-                  key={s.topic}
-                  className="flex items-center justify-between gap-2 rounded-lg px-3 py-2"
-                  style={{ background: s.count >= 3 ? "rgba(220,38,38,0.07)" : "rgba(251,191,36,0.08)" }}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className={`text-xs shrink-0 ${s.count >= 3 ? "text-red-500" : "text-amber-500"}`}>
-                      {s.count >= 3 ? "⚠" : "•"}
-                    </span>
-                    <span
-                      className="text-sm font-medium truncate capitalize"
-                      style={{ color: s.count >= 3 ? "#b91c1c" : "#92400e" }}
-                    >
-                      {s.topic}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <span
-                      className="text-xs font-bold"
-                      style={{ color: s.count >= 3 ? "#b91c1c" : "#d97706" }}
-                    >
-                      {s.count}×
-                    </span>
-                    <span
-                      className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
-                      style={
-                        s.count >= 3
-                          ? { background: "rgba(220,38,38,0.15)", color: "#b91c1c" }
-                          : { background: "rgba(245,158,11,0.15)", color: "#d97706" }
-                      }
-                    >
-                      {s.count >= 3 ? "Review" : "Watch"}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Class Standing */}
-        <div className={CARD} style={CARD_STYLE}>
-          <h2 className="text-base font-bold mb-0.5" style={{ color: "#1a2b5e" }}>Class Standing</h2>
-          <p className="text-xs text-gray-400 mb-4">Based on scores &amp; engagement</p>
-          <div className="flex flex-col items-center justify-center py-2">
-            <div className="relative w-28 h-28">
-              <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                <circle cx="50" cy="50" r="40" fill="none" stroke="#e5eaf5" strokeWidth="10" />
-                <circle
-                  cx="50" cy="50" r="40" fill="none"
-                  stroke={percentileColor} strokeWidth="10"
-                  strokeDasharray={`${strokeDash} ${CIRC}`}
-                  strokeLinecap="round"
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-2xl font-extrabold leading-none" style={{ color: percentileColor }}>
-                  {percentile}
-                </span>
-                <span className="text-[10px] text-gray-400 mt-0.5">percentile</span>
-              </div>
-            </div>
-            <span
-              className="mt-3 text-sm font-semibold px-3 py-1 rounded-full"
-              style={{ background: `${percentileColor}1a`, color: percentileColor }}
-            >
-              {percentileLabel}
-            </span>
-            <p className="text-xs text-gray-400 mt-2 text-center">
-              You score better than {percentile}% of your peers
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Activity Timeline ──────────────────────────────────── */}
-      <div className={CARD} style={CARD_STYLE}>
-        <h2 className="text-base font-bold mb-0.5" style={{ color: "#1a2b5e" }}>Activity Timeline</h2>
-        <p className="text-xs text-gray-400 mb-5">Chat messages per day — last 14 days</p>
-        <div className="flex items-end gap-1.5 h-28">
-          {timeline.map((day) => {
-            const heightPct = day.count === 0 ? 0 : Math.max((day.count / maxTimelineCount) * 100, 8);
-            const isToday = day.date === today;
-            return (
-              <div key={day.date} className="flex-1 flex flex-col items-center gap-1 group relative">
-                <div className="absolute bottom-full mb-1.5 hidden group-hover:flex justify-center z-10 pointer-events-none w-max left-1/2 -translate-x-1/2">
-                  <div className="bg-gray-900 text-white text-xs rounded-lg px-2 py-1 whitespace-nowrap">
-                    {formatDateFull(day.date)}: {day.count} msg{day.count !== 1 ? "s" : ""}
-                  </div>
-                </div>
-                <div
-                  className="w-full rounded-t-md transition-all duration-200"
-                  style={{
-                    height: `${heightPct}%`,
-                    minHeight: day.count > 0 ? "4px" : "0px",
-                    background: isToday ? "#c9a84c" : "#1a2b5e",
-                    opacity: day.count === 0 ? 0.12 : isToday ? 1 : 0.75,
-                  }}
-                />
-                <span className="text-[9px] text-gray-400 leading-none">{dayLabel(day.date)}</span>
-              </div>
-            );
-          })}
-        </div>
-        <div className="flex justify-between mt-1">
-          <span className="text-[10px] text-gray-400">{formatDateFull(timeline[0]?.date ?? "")}</span>
-          <span className="text-[10px] text-gray-400">Today</span>
-        </div>
-      </div>
-
-      {/* ── Assessment Scores ──────────────────────────────────── */}
-      <div className={CARD} style={CARD_STYLE}>
-        <h2 className="text-base font-bold mb-0.5" style={{ color: "#1a2b5e" }}>All Assessment Scores</h2>
-        <p className="text-xs text-gray-400 mb-4">Every quiz and assignment across your courses</p>
-        {assessmentScores.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-8">No assessments submitted yet.</p>
-        ) : (
-          <div className="space-y-2">
-            {assessmentScores.map((a, i) => {
-              const pct = a.total_marks > 0 ? Math.round((a.ai_score / a.total_marks) * 100) : 0;
-              return (
-                <div
-                  key={i}
-                  className="flex items-center justify-between gap-3 rounded-xl px-4 py-3 border"
-                  style={{ borderColor: "#e5eaf5", background: "#ffffff" }}
-                >
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <span
-                        className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-                        style={
-                          a.type === "quiz"
-                            ? { background: "#dbeafe", color: "#1d4ed8" }
-                            : { background: "#fef3c7", color: "#92400e" }
-                        }
-                      >
-                        {a.type === "quiz" ? "Quiz" : "Assignment"}
-                      </span>
-                      <span className="text-[10px] text-gray-400 truncate">{a.courseName}</span>
-                    </div>
-                    <p className="text-sm font-semibold truncate" style={{ color: "#1a2b5e" }}>{a.title}</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">
-                      {new Date(a.submitted_at).toLocaleDateString("en", { day: "numeric", month: "short", year: "numeric" })}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    {a.rank !== null && (
-                      <div className="text-right">
-                        <p className="text-xs font-bold" style={{ color: "#1a2b5e" }}>
-                          #{a.rank}<span className="text-gray-400 font-normal">/{a.total_students}</span>
-                        </p>
-                        <p className="text-[10px] text-gray-400">rank</p>
-                      </div>
-                    )}
-                    <div className="text-right">
-                      <span
-                        className="text-sm font-extrabold px-2.5 py-1 rounded-full"
-                        style={{ background: pctBg(pct), color: pctColor(pct) }}
-                      >
-                        {a.ai_score}/{a.total_marks}
-                      </span>
-                      <p className="text-[10px] text-gray-400 mt-0.5 text-center">{pct}%</p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
         )}
+      </div>
+
+      <div className="space-y-4">
+        {courses.map((course) => {
+          const insight = course.insight;
+          const pace = insight ? paceStyle(insight.learningPace) : null;
+          const isOpen = openCourse === course.courseId;
+
+          return (
+            <section
+              key={course.courseId}
+              className="rounded-3xl border overflow-hidden"
+              style={{ borderColor: "#e5eaf5", background: "#ffffff" }}
+            >
+              <button
+                onClick={() => setOpenCourse(isOpen ? "" : course.courseId)}
+                className="w-full px-6 py-5 text-left transition-colors"
+                style={{
+                  background: isOpen ? "#f0f4ff" : "#fafbff",
+                  borderBottom: isOpen ? "1px solid #e5eaf5" : "none",
+                }}
+              >
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span
+                        className="text-[10px] font-bold px-2 py-1 rounded-full"
+                        style={{ background: "rgba(201,168,76,0.15)", color: "#92400e" }}
+                      >
+                        {course.courseCode}
+                      </span>
+                      {pace && (
+                        <span
+                          className="text-[10px] font-semibold px-2 py-1 rounded-full"
+                          style={{ background: pace.bg, color: pace.color }}
+                        >
+                          {pace.label}
+                        </span>
+                      )}
+                    </div>
+                    <h2 className="text-xl font-extrabold" style={{ color: "#1a2b5e" }}>
+                      {course.courseName}
+                    </h2>
+                    {insight && (
+                      <p className="text-sm text-gray-500 mt-1">
+                        Current focus:{" "}
+                        <span className="font-semibold" style={{ color: "#1a2b5e" }}>
+                          {insight.currentFocus}
+                        </span>
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-3 flex-wrap justify-end">
+                    <div className="grid grid-cols-3 gap-3 min-w-[280px]">
+                      <div className="rounded-2xl p-3 text-center" style={{ background: "#eef1f9" }}>
+                        <p className="text-xl font-extrabold" style={{ color: "#1a2b5e" }}>
+                          {course.avgPct !== null ? `${course.avgPct}%` : "—"}
+                        </p>
+                        <p className="text-[10px] text-gray-500 mt-1">Avg score</p>
+                      </div>
+                      <div
+                        className="rounded-2xl p-3 text-center"
+                        style={{
+                          background: insight ? `${pctColor(insight.objectiveCompletion)}14` : "#f8fafc",
+                        }}
+                      >
+                        <p
+                          className="text-xl font-extrabold"
+                          style={{
+                            color: insight ? pctColor(insight.objectiveCompletion) : "#94a3b8",
+                          }}
+                        >
+                          {insight ? `${insight.objectiveCompletion}%` : "—"}
+                        </p>
+                        <p className="text-[10px] text-gray-500 mt-1">Objectives</p>
+                      </div>
+                      <div className="rounded-2xl p-3 text-center" style={{ background: "#f8fafc" }}>
+                        <p className="text-xl font-extrabold" style={{ color: "#1a2b5e" }}>
+                          {course.submitted}/{course.total}
+                        </p>
+                        <p className="text-[10px] text-gray-500 mt-1">Assessments</p>
+                      </div>
+                    </div>
+                    <span className="text-gray-400 text-xs shrink-0">{isOpen ? "▲" : "▼"}</span>
+                  </div>
+                </div>
+              </button>
+
+              {isOpen && (
+                <div className="p-6 space-y-5">
+                {insight && (
+                  <div className="grid grid-cols-[1.1fr_1fr] gap-5">
+                    <div
+                      className="rounded-2xl border p-4"
+                      style={{ borderColor: "#e5eaf5", background: "#fafbff" }}
+                    >
+                      <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: "#1a2b5e" }}>
+                        AI Guidance
+                      </p>
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        <span
+                          className="text-[10px] font-semibold px-2 py-1 rounded-full"
+                          style={{ background: "#eef1f9", color: "#1a2b5e" }}
+                        >
+                          {insight.confidenceLabel}
+                        </span>
+                        {insight.strengths.map((item) => (
+                          <span
+                            key={item}
+                            className="text-[10px] px-2 py-1 rounded-full"
+                            style={{ background: "#dcfce7", color: "#166534" }}
+                          >
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="space-y-2">
+                        {insight.supportStrategies.map((item) => (
+                          <div
+                            key={item}
+                            className="rounded-xl px-3 py-2 text-sm text-gray-600"
+                            style={{ background: "#ffffff" }}
+                          >
+                            {item}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div
+                      className="rounded-2xl border p-4"
+                      style={{ borderColor: "#e5eaf5", background: "#fafbff" }}
+                    >
+                      <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: "#1a2b5e" }}>
+                        Struggle Topics
+                      </p>
+                      {course.struggles.length > 0 ? (
+                        <div className="space-y-2">
+                          {course.struggles.slice(0, 4).map((item) => (
+                            <div
+                              key={item.topic}
+                              className="flex items-center justify-between rounded-xl px-3 py-2"
+                              style={{
+                                background:
+                                  item.count >= 3
+                                    ? "rgba(220,38,38,0.07)"
+                                    : "rgba(251,191,36,0.08)",
+                              }}
+                            >
+                              <span
+                                className="text-sm font-medium capitalize"
+                                style={{
+                                  color: item.count >= 3 ? "#b91c1c" : "#92400e",
+                                }}
+                              >
+                                {item.topic}
+                              </span>
+                              <span
+                                className="text-xs font-bold"
+                                style={{
+                                  color: item.count >= 3 ? "#b91c1c" : "#d97706",
+                                }}
+                              >
+                                {item.count}x
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-400">
+                          No major struggle topic detected for this course yet.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div
+                  className="rounded-2xl border p-4"
+                  style={{ borderColor: "#e5eaf5", background: "#fafbff" }}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-bold uppercase tracking-wider" style={{ color: "#1a2b5e" }}>
+                      Recent Assessments
+                    </p>
+                    <span className="text-[11px] text-gray-400">
+                      {course.assessments.length} submitted
+                    </span>
+                  </div>
+
+                  {course.assessments.length > 0 ? (
+                    <div className="space-y-2">
+                      {course.assessments.slice(0, 5).map((assessment, index) => {
+                        const pct =
+                          assessment.total_marks > 0
+                            ? Math.round((assessment.ai_score / assessment.total_marks) * 100)
+                            : 0;
+
+                        return (
+                          <div
+                            key={`${assessment.title}-${index}`}
+                            className="flex items-center justify-between gap-3 rounded-xl px-4 py-3"
+                            style={{ background: "#ffffff" }}
+                          >
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span
+                                  className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                                  style={
+                                    assessment.type === "quiz"
+                                      ? { background: "#dbeafe", color: "#1d4ed8" }
+                                      : { background: "#fef3c7", color: "#92400e" }
+                                  }
+                                >
+                                  {assessment.type === "quiz" ? "Quiz" : "Assignment"}
+                                </span>
+                              </div>
+                              <p className="text-sm font-semibold truncate" style={{ color: "#1a2b5e" }}>
+                                {assessment.title}
+                              </p>
+                              <p className="text-[10px] text-gray-400 mt-0.5">
+                                {new Date(assessment.submitted_at).toLocaleDateString("en", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                })}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0">
+                              {assessment.rank !== null && (
+                                <div className="text-right">
+                                  <p className="text-xs font-bold" style={{ color: "#1a2b5e" }}>
+                                    #{assessment.rank}
+                                  </p>
+                                  <p className="text-[10px] text-gray-400">
+                                    /{assessment.total_students}
+                                  </p>
+                                </div>
+                              )}
+                              <span
+                                className="text-sm font-extrabold px-2.5 py-1 rounded-full"
+                                style={{ background: pctBg(pct), color: pctColor(pct) }}
+                              >
+                                {assessment.ai_score}/{assessment.total_marks}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400">
+                      No submitted assessments in this course yet.
+                    </p>
+                  )}
+                </div>
+                </div>
+              )}
+            </section>
+          );
+        })}
+      </div>
+
+      <div className={CARD} style={CARD_STYLE}>
+        <h2 className="text-base font-bold mb-0.5" style={{ color: "#1a2b5e" }}>
+          Learning Activity
+        </h2>
+        <p className="text-xs text-gray-400 mb-4">
+          Overall activity across all courses over the last 14 days
+        </p>
+        <div className="flex items-center gap-3 flex-wrap">
+          {timeline.map((day) => (
+            <div key={day.date} className="min-w-[54px] text-center">
+              <div
+                className="rounded-xl px-2 py-3"
+                style={{
+                  background: day.count > 0 ? "#eef1f9" : "#f8fafc",
+                  color: day.count > 0 ? "#1a2b5e" : "#94a3b8",
+                }}
+              >
+                <p className="text-sm font-extrabold">{day.count}</p>
+              </div>
+              <p className="text-[10px] text-gray-400 mt-1">
+                {new Date(day.date + "T12:00:00")
+                  .toLocaleDateString("en", { weekday: "short" })
+                  .slice(0, 3)}
+              </p>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

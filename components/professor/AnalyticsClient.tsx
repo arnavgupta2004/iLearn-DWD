@@ -17,6 +17,11 @@ interface ChatDay {
   count: number;
 }
 
+interface TopicInsight {
+  topic: string;
+  reason: string;
+}
+
 interface Student {
   studentId: string;
   fullName: string;
@@ -29,6 +34,16 @@ interface Student {
   totalAssessments: number;
   completionRate: number;
   chatTimeline: ChatDay[];
+  objectiveCompletion: number;
+  goalProgress: number;
+  weeklyMomentum: number;
+  theoryUnderstanding: number;
+  practicalSkill: number;
+  strengths: TopicInsight[];
+  growthTopics: TopicInsight[];
+  recommendedSupport: string[];
+  bestContributionAreas: string[];
+  coachSummary: string;
 }
 
 interface CourseData {
@@ -37,6 +52,14 @@ interface CourseData {
   code: string;
   students: Student[];
   aggregateTopics: [string, number][];
+  topicTalentMap: { topic: string; studentIds: string[]; reason: string }[];
+  courseInsights: {
+    objectiveCoverage: number;
+    weeklyTrend: string;
+    atRiskTopics: string[];
+    recommendedActions: string[];
+    personalizationSummary: string;
+  };
 }
 
 interface Props {
@@ -46,8 +69,38 @@ interface Props {
 function scoreColor(p: number) {
   return p >= 70 ? "#16a34a" : p >= 50 ? "#d97706" : "#dc2626";
 }
+
 function scoreBg(p: number) {
   return p >= 70 ? "#dcfce7" : p >= 50 ? "#fef3c7" : "#fee2e2";
+}
+
+function meterColor(p: number) {
+  return p >= 75 ? "#16a34a" : p >= 55 ? "#d97706" : "#dc2626";
+}
+
+function MetricBar({
+  label,
+  value,
+}: {
+  label: string;
+  value: number;
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[11px] font-semibold text-gray-500">{label}</span>
+        <span className="text-[11px] font-bold" style={{ color: meterColor(value) }}>
+          {value}%
+        </span>
+      </div>
+      <div className="h-2 rounded-full overflow-hidden" style={{ background: "#e5eaf5" }}>
+        <div
+          className="h-full rounded-full"
+          style={{ width: `${value}%`, background: meterColor(value) }}
+        />
+      </div>
+    </div>
+  );
 }
 
 function StudentDetailPanel({
@@ -64,26 +117,25 @@ function StudentDetailPanel({
 
   const avgPct = student.avgScore;
   const bestPct = student.assessmentSubmissions.length > 0
-    ? Math.max(...student.assessmentSubmissions.map((s) =>
-        s.total_marks > 0 ? Math.round((s.ai_score / s.total_marks) * 100) : 0
-      ))
+    ? Math.max(
+        ...student.assessmentSubmissions.map((s) =>
+          s.total_marks > 0 ? Math.round((s.ai_score / s.total_marks) * 100) : 0
+        )
+      )
     : null;
 
   return (
     <>
-      {/* Backdrop */}
       <div
         className="fixed inset-0 z-40"
         style={{ background: "rgba(10,20,55,0.3)" }}
         onClick={onClose}
       />
 
-      {/* Panel */}
       <div
         className="fixed top-0 right-0 h-full z-50 flex flex-col overflow-hidden shadow-2xl"
-        style={{ width: 480, background: "#ffffff" }}
+        style={{ width: 520, background: "#ffffff" }}
       >
-        {/* Header */}
         <div
           className="flex items-start justify-between px-6 py-5 border-b shrink-0"
           style={{ borderColor: "#e5eaf5", background: "#fafbff" }}
@@ -114,8 +166,7 @@ function StudentDetailPanel({
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {/* Quick stats */}
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-5 gap-3">
             {[
               {
                 label: "Avg Score",
@@ -141,12 +192,14 @@ function StudentDetailPanel({
                 color: "#6d28d9",
                 bg: "#ede9fe",
               },
+              {
+                label: "Goal Progress",
+                value: `${student.goalProgress}%`,
+                color: meterColor(student.goalProgress),
+                bg: `${meterColor(student.goalProgress)}14`,
+              },
             ].map((s) => (
-              <div
-                key={s.label}
-                className="rounded-xl p-3 text-center"
-                style={{ background: s.bg }}
-              >
+              <div key={s.label} className="rounded-xl p-3 text-center" style={{ background: s.bg }}>
                 <p className="text-lg font-extrabold leading-none" style={{ color: s.color }}>
                   {s.value}
                 </p>
@@ -157,7 +210,41 @@ function StudentDetailPanel({
             ))}
           </div>
 
-          {/* Completion bar */}
+          <div
+            className="rounded-2xl border p-4"
+            style={{ borderColor: "#e5eaf5", background: "#fafbff" }}
+          >
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider" style={{ color: "#1a2b5e" }}>
+                  Objective Readiness
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  AI estimate of how close this student is to completing the course objectives
+                </p>
+              </div>
+              <span
+                className="text-sm font-extrabold px-3 py-1 rounded-full"
+                style={{
+                  color: meterColor(student.objectiveCompletion),
+                  background: `${meterColor(student.objectiveCompletion)}14`,
+                }}
+              >
+                {student.objectiveCompletion}%
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              <MetricBar label="Weekly Momentum" value={student.weeklyMomentum} />
+              <MetricBar label="Theory Understanding" value={student.theoryUnderstanding} />
+              <MetricBar label="Practical Skill" value={student.practicalSkill} />
+            </div>
+
+            {student.coachSummary && (
+              <p className="text-sm text-gray-600 mt-4 leading-relaxed">{student.coachSummary}</p>
+            )}
+          </div>
+
           {student.totalAssessments > 0 && (
             <div>
               <div className="flex justify-between mb-1.5">
@@ -183,7 +270,81 @@ function StudentDetailPanel({
             </div>
           )}
 
-          {/* Assessment scores */}
+          <div className="grid grid-cols-2 gap-4">
+            <div
+              className="rounded-2xl border p-4"
+              style={{ borderColor: "#e5eaf5", background: "#fafbff" }}
+            >
+              <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: "#1a2b5e" }}>
+                Best Topic Fit
+              </p>
+              <div className="space-y-2">
+                {student.strengths.length > 0 ? (
+                  student.strengths.map((item) => (
+                    <div
+                      key={item.topic}
+                      className="rounded-xl px-3 py-2"
+                      style={{ background: "rgba(22,163,74,0.08)" }}
+                    >
+                      <p className="text-sm font-semibold" style={{ color: "#166534" }}>
+                        {item.topic}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">{item.reason}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-gray-400">AI needs more evidence to identify a standout topic.</p>
+                )}
+              </div>
+            </div>
+
+            <div
+              className="rounded-2xl border p-4"
+              style={{ borderColor: "#e5eaf5", background: "#fafbff" }}
+            >
+              <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: "#1a2b5e" }}>
+                Growth Topics
+              </p>
+              <div className="space-y-2">
+                {student.growthTopics.length > 0 ? (
+                  student.growthTopics.map((item) => (
+                    <div
+                      key={item.topic}
+                      className="rounded-xl px-3 py-2"
+                      style={{ background: "rgba(220,38,38,0.06)" }}
+                    >
+                      <p className="text-sm font-semibold" style={{ color: "#991b1b" }}>
+                        {item.topic}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">{item.reason}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-gray-400">No major risk topic is visible right now.</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {student.recommendedSupport.length > 0 && (
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: "#1a2b5e" }}>
+                AI Support Plan
+              </p>
+              <div className="space-y-2">
+                {student.recommendedSupport.map((item) => (
+                  <div
+                    key={item}
+                    className="rounded-xl px-3 py-2 text-sm text-gray-600"
+                    style={{ background: "#f8fafc" }}
+                  >
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {student.assessmentSubmissions.length > 0 && (
             <div>
               <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: "#1a2b5e" }}>
@@ -218,7 +379,9 @@ function StudentDetailPanel({
                         </p>
                         <p className="text-[10px] text-gray-400">
                           {new Date(sub.submitted_at).toLocaleDateString("en", {
-                            day: "numeric", month: "short", year: "numeric",
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
                           })}
                         </p>
                       </div>
@@ -242,47 +405,6 @@ function StudentDetailPanel({
             </div>
           )}
 
-          {/* Struggle topics */}
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: "#1a2b5e" }}>
-              Struggle Topics
-            </p>
-            {student.allStruggles.length === 0 ? (
-              <p className="text-xs text-gray-400">No struggle topics yet.</p>
-            ) : (
-              <div className="space-y-1.5">
-                {student.allStruggles.map((s) => (
-                  <div
-                    key={s.topic}
-                    className="flex items-center justify-between rounded-lg px-3 py-2"
-                    style={{
-                      background: s.count >= 3 ? "rgba(220,38,38,0.07)" : "rgba(251,191,36,0.07)",
-                    }}
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className={`text-xs shrink-0 ${s.count >= 3 ? "text-red-500" : "text-amber-500"}`}>
-                        {s.count >= 3 ? "⚠" : "•"}
-                      </span>
-                      <span
-                        className="text-sm font-medium truncate capitalize"
-                        style={{ color: s.count >= 3 ? "#b91c1c" : "#92400e" }}
-                      >
-                        {s.topic}
-                      </span>
-                    </div>
-                    <span
-                      className="text-xs font-bold shrink-0 ml-2"
-                      style={{ color: s.count >= 3 ? "#b91c1c" : "#d97706" }}
-                    >
-                      {s.count}×
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Chat activity */}
           <div>
             <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: "#1a2b5e" }}>
               Chat Activity (last 14 days)
@@ -311,7 +433,9 @@ function StudentDetailPanel({
                       }}
                     />
                     <span className="text-[8px] text-gray-400">
-                      {new Date(day.date + "T12:00:00").toLocaleDateString("en", { weekday: "short" }).slice(0, 1)}
+                      {new Date(day.date + "T12:00:00").toLocaleDateString("en", {
+                        weekday: "short",
+                      }).slice(0, 1)}
                     </span>
                   </div>
                 );
@@ -326,14 +450,17 @@ function StudentDetailPanel({
 
 export default function AnalyticsClient({ courses }: Props) {
   const [openCourse, setOpenCourse] = useState<string>(courses[0]?.id ?? "");
-  const [selectedStudent, setSelectedStudent] = useState<{ student: Student; courseName: string } | null>(null);
+  const [selectedStudent, setSelectedStudent] = useState<{
+    student: Student;
+    courseName: string;
+  } | null>(null);
 
   return (
     <>
-      <div className="space-y-4 max-w-5xl">
+      <div className="space-y-4 max-w-6xl">
         {courses.map((course) => {
           const isOpen = openCourse === course.id;
-          const sorted = [...course.students].sort((a, b) => b.interactionCount - a.interactionCount);
+          const sorted = [...course.students].sort((a, b) => b.goalProgress - a.goalProgress);
 
           return (
             <div
@@ -353,7 +480,9 @@ export default function AnalyticsClient({ courses }: Props) {
                   >
                     {course.code}
                   </span>
-                  <span className="font-bold" style={{ color: "#1a2b5e" }}>{course.name}</span>
+                  <span className="font-bold" style={{ color: "#1a2b5e" }}>
+                    {course.name}
+                  </span>
                   <span className="text-sm text-gray-400">
                     {course.students.length} student{course.students.length !== 1 ? "s" : ""}
                   </span>
@@ -367,15 +496,104 @@ export default function AnalyticsClient({ courses }: Props) {
                     <p className="text-sm text-gray-400">No enrolled students yet.</p>
                   ) : (
                     <>
+                      <div className="grid grid-cols-4 gap-3 mb-6">
+                        {[
+                          {
+                            label: "Objective Coverage",
+                            value: `${course.courseInsights.objectiveCoverage}%`,
+                            color: meterColor(course.courseInsights.objectiveCoverage),
+                            bg: `${meterColor(course.courseInsights.objectiveCoverage)}14`,
+                          },
+                          {
+                            label: "Students Near Goal",
+                            value: String(course.students.filter((student) => student.goalProgress >= 75).length),
+                            color: "#166534",
+                            bg: "#dcfce7",
+                          },
+                          {
+                            label: "Need Support",
+                            value: String(course.students.filter((student) => student.goalProgress < 55).length),
+                            color: "#991b1b",
+                            bg: "#fee2e2",
+                          },
+                          {
+                            label: "Topic Experts",
+                            value: String(course.topicTalentMap.length),
+                            color: "#1a2b5e",
+                            bg: "#eef1f9",
+                          },
+                        ].map((item) => (
+                          <div key={item.label} className="rounded-2xl p-4" style={{ background: item.bg }}>
+                            <p className="text-2xl font-extrabold leading-none" style={{ color: item.color }}>
+                              {item.value}
+                            </p>
+                            <p className="text-[11px] font-semibold mt-1" style={{ color: item.color }}>
+                              {item.label}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 mb-6">
+                        <div
+                          className="rounded-2xl border p-4"
+                          style={{ borderColor: "#e5eaf5", background: "#fafbff" }}
+                        >
+                          <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "#1a2b5e" }}>
+                            AI Course Read
+                          </p>
+                          <p className="text-sm text-gray-600 leading-relaxed">
+                            {course.courseInsights.weeklyTrend}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-3 leading-relaxed">
+                            {course.courseInsights.personalizationSummary}
+                          </p>
+                          {course.courseInsights.atRiskTopics.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-3">
+                              {course.courseInsights.atRiskTopics.map((topic) => (
+                                <span
+                                  key={topic}
+                                  className="text-xs px-2 py-1 rounded-full"
+                                  style={{ background: "rgba(220,38,38,0.08)", color: "#991b1b" }}
+                                >
+                                  {topic}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <div
+                          className="rounded-2xl border p-4"
+                          style={{ borderColor: "#e5eaf5", background: "#fafbff" }}
+                        >
+                          <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "#1a2b5e" }}>
+                            Professor Actions
+                          </p>
+                          <div className="space-y-2">
+                            {course.courseInsights.recommendedActions.map((action) => (
+                              <div
+                                key={action}
+                                className="rounded-xl px-3 py-2 text-sm text-gray-600"
+                                style={{ background: "#ffffff" }}
+                              >
+                                {action}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
                       <div className="overflow-x-auto mb-6">
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b" style={{ borderColor: "#e5eaf5" }}>
                               <th className="text-left py-2 pr-4 text-xs font-semibold text-gray-400">Student</th>
-                              <th className="text-center py-2 px-4 text-xs font-semibold text-gray-400">Interactions</th>
-                              <th className="text-center py-2 px-4 text-xs font-semibold text-gray-400">Avg Score</th>
-                              <th className="text-center py-2 px-4 text-xs font-semibold text-gray-400">Completion</th>
-                              <th className="text-left py-2 pl-4 text-xs font-semibold text-gray-400">Top Struggles</th>
+                              <th className="text-center py-2 px-4 text-xs font-semibold text-gray-400">Goal</th>
+                              <th className="text-center py-2 px-4 text-xs font-semibold text-gray-400">Objectives</th>
+                              <th className="text-center py-2 px-4 text-xs font-semibold text-gray-400">Weekly</th>
+                              <th className="text-center py-2 px-4 text-xs font-semibold text-gray-400">Theory / Practical</th>
+                              <th className="text-left py-2 pl-4 text-xs font-semibold text-gray-400">Strongest Topics</th>
                               <th className="py-2 text-xs font-semibold text-gray-400" />
                             </tr>
                           </thead>
@@ -386,12 +604,12 @@ export default function AnalyticsClient({ courses }: Props) {
                                 className="border-b last:border-0 cursor-pointer transition-colors"
                                 style={{ borderColor: "#f1f5f9" }}
                                 onClick={() => setSelectedStudent({ student, courseName: course.name })}
-                                onMouseEnter={(e) =>
-                                  ((e.currentTarget as HTMLElement).style.background = "#f8f9ff")
-                                }
-                                onMouseLeave={(e) =>
-                                  ((e.currentTarget as HTMLElement).style.background = "transparent")
-                                }
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = "#f8f9ff";
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = "transparent";
+                                }}
                               >
                                 <td className="py-3 pr-4">
                                   <p className="font-medium" style={{ color: "#1a2b5e" }}>
@@ -400,60 +618,64 @@ export default function AnalyticsClient({ courses }: Props) {
                                   <p className="text-xs text-gray-400">{student.email}</p>
                                 </td>
                                 <td className="py-3 px-4 text-center">
-                                  <span className="font-bold" style={{ color: "#1a2b5e" }}>
-                                    {student.interactionCount}
+                                  <span
+                                    className="font-bold px-2 py-0.5 rounded-full text-xs"
+                                    style={{
+                                      color: meterColor(student.goalProgress),
+                                      background: `${meterColor(student.goalProgress)}14`,
+                                    }}
+                                  >
+                                    {student.goalProgress}%
                                   </span>
                                 </td>
                                 <td className="py-3 px-4 text-center">
-                                  {student.avgScore !== null ? (
-                                    <span
-                                      className="font-bold px-2 py-0.5 rounded-full text-xs"
-                                      style={{
-                                        color: scoreColor(student.avgScore),
-                                        background: scoreBg(student.avgScore),
-                                      }}
-                                    >
-                                      {student.avgScore}%
+                                  <div className="flex flex-col items-center gap-1">
+                                    <span className="text-xs font-bold" style={{ color: meterColor(student.objectiveCompletion) }}>
+                                      {student.objectiveCompletion}%
                                     </span>
-                                  ) : (
-                                    <span className="text-gray-300 text-xs">—</span>
-                                  )}
+                                    <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: "#e5eaf5" }}>
+                                      <div
+                                        className="h-full rounded-full"
+                                        style={{
+                                          width: `${student.objectiveCompletion}%`,
+                                          background: meterColor(student.objectiveCompletion),
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
                                 </td>
                                 <td className="py-3 px-4 text-center">
-                                  {student.totalAssessments > 0 ? (
-                                    <div className="flex flex-col items-center gap-1">
-                                      <span className="text-xs font-bold" style={{ color: scoreColor(student.completionRate) }}>
-                                        {student.completionRate}%
-                                      </span>
-                                      <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: "#e5eaf5" }}>
-                                        <div
-                                          className="h-full rounded-full"
-                                          style={{
-                                            width: `${student.completionRate}%`,
-                                            background: scoreColor(student.completionRate),
-                                          }}
-                                        />
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <span className="text-gray-300 text-xs">—</span>
-                                  )}
+                                  <span
+                                    className="font-bold px-2 py-0.5 rounded-full text-xs"
+                                    style={{
+                                      color: meterColor(student.weeklyMomentum),
+                                      background: `${meterColor(student.weeklyMomentum)}14`,
+                                    }}
+                                  >
+                                    {student.weeklyMomentum}%
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4 text-center">
+                                  <div className="flex flex-col items-center gap-1 text-xs">
+                                    <span style={{ color: "#1d4ed8" }}>T {student.theoryUnderstanding}%</span>
+                                    <span style={{ color: "#92400e" }}>P {student.practicalSkill}%</span>
+                                  </div>
                                 </td>
                                 <td className="py-3 pl-4">
-                                  {student.topStruggles.length > 0 ? (
+                                  {student.strengths.length > 0 ? (
                                     <div className="flex flex-wrap gap-1">
-                                      {student.topStruggles.map((t) => (
+                                      {student.strengths.slice(0, 3).map((item) => (
                                         <span
-                                          key={t}
+                                          key={item.topic}
                                           className="text-xs px-2 py-0.5 rounded-full"
-                                          style={{ background: "rgba(220,38,38,0.08)", color: "#b91c1c" }}
+                                          style={{ background: "rgba(22,163,74,0.10)", color: "#166534" }}
                                         >
-                                          {t}
+                                          {item.topic}
                                         </span>
                                       ))}
                                     </div>
                                   ) : (
-                                    <span className="text-gray-300 text-xs">None yet</span>
+                                    <span className="text-gray-300 text-xs">Need more evidence</span>
                                   )}
                                 </td>
                                 <td className="py-3 pl-2 pr-1">
@@ -464,6 +686,47 @@ export default function AnalyticsClient({ courses }: Props) {
                           </tbody>
                         </table>
                       </div>
+
+                      {course.topicTalentMap.length > 0 && (
+                        <div className="mb-6">
+                          <p className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "#94a3b8" }}>
+                            Student Strength Map
+                          </p>
+                          <div className="grid grid-cols-2 gap-3">
+                            {course.topicTalentMap.map((item) => {
+                              const names = item.studentIds
+                                .map((studentId) =>
+                                  course.students.find((student) => student.studentId === studentId)?.fullName
+                                )
+                                .filter(Boolean);
+
+                              return (
+                                <div
+                                  key={item.topic}
+                                  className="rounded-2xl border p-4"
+                                  style={{ borderColor: "#e5eaf5", background: "#fafbff" }}
+                                >
+                                  <p className="text-sm font-bold" style={{ color: "#1a2b5e" }}>
+                                    {item.topic}
+                                  </p>
+                                  <p className="text-xs text-gray-500 mt-1 leading-relaxed">{item.reason}</p>
+                                  <div className="flex flex-wrap gap-2 mt-3">
+                                    {names.map((name) => (
+                                      <span
+                                        key={name}
+                                        className="text-xs px-2 py-1 rounded-full"
+                                        style={{ background: "#eef1f9", color: "#1a2b5e" }}
+                                      >
+                                        {name}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
 
                       {course.aggregateTopics.length > 0 && (
                         <div>
@@ -477,7 +740,9 @@ export default function AnalyticsClient({ courses }: Props) {
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm"
                                 style={{ background: "#eef1f9" }}
                               >
-                                <span style={{ color: "#1a2b5e" }} className="font-medium">{topic}</span>
+                                <span className="font-medium" style={{ color: "#1a2b5e" }}>
+                                  {topic}
+                                </span>
                                 <span
                                   className="text-xs px-1.5 py-0.5 rounded-full font-bold"
                                   style={{ background: "#1a2b5e", color: "white" }}

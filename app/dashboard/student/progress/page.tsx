@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase-server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
+import { generateStudentLearningProfile } from "@/lib/learning-intelligence";
 import { redirect } from "next/navigation";
 import ProgressClient from "@/components/student/ProgressClient";
 
@@ -136,7 +137,10 @@ export default async function MyProgressPage() {
           .in("id", assessmentIds)
       : { data: [] },
     courseIds.length
-      ? supabaseAdmin.from("courses").select("id, name, code").in("id", courseIds)
+      ? supabaseAdmin
+          .from("courses")
+          .select("id, name, code, objectives, learning_outcomes")
+          .in("id", courseIds)
       : { data: [] },
     // Total assessments available per course (for completion rate)
     courseIds.length
@@ -147,13 +151,40 @@ export default async function MyProgressPage() {
       : { data: [] },
   ]);
 
+  const { data: courseUnits } = courseIds.length
+    ? await supabaseAdmin
+        .from("course_units")
+        .select("course_id, title, topics")
+        .in("course_id", courseIds)
+        .order("unit_number")
+    : { data: [] };
+
   const assessmentMap: Record<string, { title: string; type: string; course_id: string }> = {};
   for (const a of assessmentDetails.data ?? []) {
     assessmentMap[a.id] = { title: a.title, type: a.type, course_id: a.course_id };
   }
-  const courseMap: Record<string, { name: string; code: string }> = {};
+  const courseMap: Record<string, {
+    name: string;
+    code: string;
+    objectives: string[];
+    learningOutcomes: string[];
+  }> = {};
   for (const c of courseDetails.data ?? []) {
-    courseMap[c.id] = { name: c.name, code: c.code };
+    courseMap[c.id] = {
+      name: c.name,
+      code: c.code,
+      objectives: Array.isArray(c.objectives) ? c.objectives : [],
+      learningOutcomes: Array.isArray(c.learning_outcomes) ? c.learning_outcomes : [],
+    };
+  }
+
+  const courseUnitsMap: Record<string, { title: string; topics: string[] }[]> = {};
+  for (const unit of courseUnits ?? []) {
+    if (!courseUnitsMap[unit.course_id]) courseUnitsMap[unit.course_id] = [];
+    courseUnitsMap[unit.course_id].push({
+      title: unit.title ?? "Unit",
+      topics: Array.isArray(unit.topics) ? unit.topics : [],
+    });
   }
 
   // ── Enrich assessment scores ──────────────────────────────────────────────
@@ -194,7 +225,7 @@ export default async function MyProgressPage() {
       total: totalByCoursePub[cid] ?? 0,
       avgPct,
     };
-  }).filter((c) => c.total > 0 || c.submitted > 0);
+  });
 
   // ── Score trend: last 10 submissions ordered chronologically ─────────────
   const scoreTrend = [...assessmentScores]
@@ -236,6 +267,40 @@ export default async function MyProgressPage() {
     .eq("student_id", user.id)
     .eq("role", "user");
 
+  const studentLearningProfile = await generateStudentLearningProfile({
+    struggles: (struggles ?? []).map((item) => ({ topic: item.topic, count: item.count })),
+    percentile,
+    totalChats: totalChats ?? 0,
+    courses: coursePerformance.map((course) => {
+      const recentAssessments = (mySubs ?? [])
+        .filter((sub) => assessmentMap[sub.assessment_id]?.course_id === course.courseId)
+        .map((sub) => ({
+          title: assessmentMap[sub.assessment_id]?.title ?? "Assessment",
+          type: (assessmentMap[sub.assessment_id]?.type ?? "quiz") as "quiz" | "assignment",
+          ai_score: sub.ai_score ?? 0,
+          total_marks: sub.total_marks ?? 100,
+          submitted_at: sub.submitted_at as string,
+        }))
+        .slice(0, 5);
+
+      return {
+        courseId: course.courseId,
+        courseName: course.courseName,
+        courseCode: course.courseCode,
+        objectives: courseMap[course.courseId]?.objectives ?? [],
+        learningOutcomes: courseMap[course.courseId]?.learningOutcomes ?? [],
+        units: courseUnitsMap[course.courseId] ?? [],
+        avgPct: course.avgPct,
+        submitted: course.submitted,
+        total: course.total,
+        struggles: (struggles ?? [])
+          .filter((item) => item.course_id === course.courseId)
+          .map((item) => ({ topic: item.topic, count: item.count })),
+        recentAssessments,
+      };
+    }),
+  });
+
   return (
     <div className="h-full overflow-y-auto p-8">
       <h1 className="text-2xl font-extrabold mb-1" style={{ color: "#1a2b5e" }}>
@@ -245,12 +310,17 @@ export default async function MyProgressPage() {
         A complete view of your academic performance and learning activity
       </p>
       <ProgressClient
-        struggles={(struggles ?? []).map((s) => ({ topic: s.topic, count: s.count }))}
+        struggles={(struggles ?? []).map((s) => ({
+          topic: s.topic,
+          count: s.count,
+          courseId: s.course_id,
+        }))}
         percentile={percentile}
         timeline={timeline}
         assessmentScores={assessmentScores}
         coursePerformance={coursePerformance}
         scoreTrend={scoreTrend}
+        learningProfile={studentLearningProfile}
         overviewStats={{
           avgScorePct,
           bestScorePct,
