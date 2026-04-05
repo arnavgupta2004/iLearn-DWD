@@ -20,6 +20,9 @@ export async function POST(
     if (!file || !studentId || !courseId) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
+    if (file.type !== "application/pdf") {
+      return NextResponse.json({ error: "Please upload a PDF file." }, { status: 400 });
+    }
 
     // Guard: prevent duplicate submissions
     const { data: existing } = await supabaseAdmin
@@ -36,18 +39,34 @@ export async function POST(
       );
     }
 
-    // 1. Upload file to storage
+    // 1. Ensure submissions storage bucket exists
+    const BUCKET = "submissions";
+    const { data: buckets } = await supabaseAdmin.storage.listBuckets();
+    const bucketExists = buckets?.some((bucket) => bucket.name === BUCKET);
+    if (!bucketExists) {
+      const { error: createBucketError } = await supabaseAdmin.storage.createBucket(BUCKET, {
+        public: false,
+      });
+      if (createBucketError && !createBucketError.message.toLowerCase().includes("already exists")) {
+        return NextResponse.json(
+          { error: `Could not create submissions bucket: ${createBucketError.message}` },
+          { status: 500 }
+        );
+      }
+    }
+
+    // 2. Upload file to storage
     const filePath = `assessments/${assessmentId}/${studentId}/${Date.now()}-${file.name}`;
     const buffer = Buffer.from(await file.arrayBuffer());
     const { error: uploadErr } = await supabaseAdmin.storage
-      .from("submissions")
+      .from(BUCKET)
       .upload(filePath, buffer, { contentType: file.type });
 
     if (uploadErr) {
       return NextResponse.json({ error: uploadErr.message }, { status: 500 });
     }
 
-    // 2. Fetch assessment details
+    // 3. Fetch assessment details
     const { data: assessment } = await supabaseAdmin
       .from("assessments")
       .select("title, description, total_marks")
@@ -56,7 +75,7 @@ export async function POST(
 
     const totalMarks = assessment?.total_marks ?? 100;
 
-    // 3. Parse PDF
+    // 4. Parse PDF
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const pdfParse = require("pdf-parse/lib/pdf-parse");
     const parsed = await pdfParse(buffer);
@@ -69,7 +88,7 @@ export async function POST(
       );
     }
 
-    // 4. Evaluate with Gemini
+    // 5. Evaluate with Gemini
     const prompt = `You are an academic evaluator at IIIT Dharwad. Evaluate this student assignment submission.
 
 Assignment Title: ${assessment?.title ?? "Assignment"}
@@ -98,7 +117,7 @@ ${submissionText.slice(0, 10000)}`;
     const evaluation = JSON.parse(raw);
     const score = Math.min(Math.max(0, Number(evaluation.score ?? 0)), totalMarks);
 
-    // 5. Save submission
+    // 6. Save submission
     const { data: submission, error: insertErr } = await supabaseAdmin
       .from("assessment_submissions")
       .insert({
@@ -128,7 +147,7 @@ ${submissionText.slice(0, 10000)}`;
       );
     }
 
-    // 6. Compute rank
+    // 7. Compute rank
     const { data: allSubs } = await supabaseAdmin
       .from("assessment_submissions")
       .select("id, ai_score")
