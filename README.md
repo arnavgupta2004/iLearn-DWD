@@ -1,10 +1,14 @@
-# iLearn DWD — Academic AI Platform for IIIT Dharwad
+# iLearn DWD — AI Academic Platform for IIIT Dharwad
 
 > The smarter way to learn & teach at IIIT Dharwad.
 
 **Live:** [https://iiitdwd-edu.vercel.app](https://iiitdwd-edu.vercel.app)
 
-iLearn DWD is a full-stack academic platform that brings AI-powered Q&A, RAG over course materials, professor-requested quizzes and assignments, AI learning intelligence, smart calendars, and real-time analytics to professors and students at IIIT Dharwad.
+iLearn DWD is a full-stack academic platform for teaching and learning at IIIT Dharwad. It combines AI tutoring, retrieval-augmented generation over uploaded course materials, professor-managed quizzes and assignment requests, personalized student progress intelligence, topic analytics, and calendar-based academic scheduling in one system.
+
+This project was built as an end-to-end academic assistant for two roles:
+- **Professors** manage courses, upload materials, create quizzes or assignment requests, review flagged questions, track analytics, and manage calendar events/interview requests.
+- **Students** enroll in courses, learn through an AI tutor, complete professor-requested assessments, monitor progress course-wise, and use calendar/interview features for planning and support.
 
 ---
 
@@ -16,6 +20,7 @@ iLearn DWD is a full-stack academic platform that brings AI-powered Q&A, RAG ove
 - **Quiz & Assignment Requests** — Professors can explicitly create on-platform quizzes or request PDF assignment submissions from students
 - **Flagged Questions** — View student questions the AI couldn't answer; reply directly and answers appear in the student's chat history
 - **AI Analytics** — Per-course objective completion, theory vs practical skill, weekly momentum, student topic strengths, and personalized support suggestions
+- **Topic Expertise View** — See which students are strongest in which topics of a course
 - **Calendar & Scheduling** — Add classes, meetings, office hours, and manage student interview requests in the professor calendar
 - **Page-Specific AI Assistants** — Context-aware chatbots help professors reason about courses, flagged questions, analytics, and calendar items
 
@@ -27,7 +32,16 @@ iLearn DWD is a full-stack academic platform that brings AI-powered Q&A, RAG ove
 - **My Progress** — AI-generated course-wise progress tracking with objective completion, growth priorities, and personalized improvement guidance
 - **Smart To Do** — Upcoming quizzes and assignment requests are automatically surfaced and prioritized
 - **Calendar & Interviews** — View deadlines, scheduled classes/events, and request interview/discussion slots with professors
+- **Study Support** — AI-inferred struggle topics, study buddies, micro-quizzes, and guided improvement recommendations
 - **Page-Specific AI Assistants** — Dedicated assistants help students with courses, to-do prioritization, progress improvement, and calendar planning
+
+### AI Capabilities
+- **Syllabus Intelligence** — Extracts structured course metadata from a PDF syllabus
+- **RAG Tutor** — Uses uploaded course materials as grounding context for student chat
+- **Assignment & Quiz Evaluation** — Automatically scores quizzes and assignment PDFs with feedback
+- **Learning Intelligence** — Infers course objective completion, student strengths, weak areas, and personalized suggestions
+- **Flag Escalation** — Detects uncertain AI answers and forwards them to professors when needed
+- **Page-Scoped Assistants** — Each dashboard page has its own context-limited chatbot
 
 ---
 
@@ -76,6 +90,7 @@ eduai/
 │   ├── gemini.ts                  # Gemini Flash + embedding client
 │   ├── groq.ts                    # Groq client
 │   ├── rag.ts                     # RAG retrieval functions
+│   ├── struggle-tracker.ts        # Topic struggle tagging helpers
 │   ├── doc-processor.ts           # PDF/DOCX/PPTX text extraction & chunking
 │   ├── supabase.ts                # Browser Supabase client
 │   ├── supabase-server.ts         # Server Supabase client (cookie-aware)
@@ -310,6 +325,9 @@ Create two **private** buckets in Supabase Storage:
 - `course-materials`
 - `submissions`
 
+Note:
+- The assignment submission route can create the `submissions` bucket automatically if it is missing, but creating both buckets explicitly in Supabase is still recommended for first-time setup.
+
 ### 5. Run locally
 
 ```bash
@@ -326,6 +344,26 @@ Open [http://localhost:3000](http://localhost:3000).
 2. Import the project in [Vercel](https://vercel.com)
 3. Add all environment variables from `.env.local` in the Vercel dashboard
 4. Deploy
+
+---
+
+## Important Implementation Notes
+
+- **Single submission system**: the project now uses only `assessments` and `assessment_submissions`. The older legacy submission flow has been removed from the active app.
+- **Session-based API protection**: important student-facing routes such as chat, quiz submission, assignment submission, study matching, micro-quiz generation, page chat, and calendar interview requests now validate the authenticated session server-side instead of trusting browser-sent student IDs.
+- **Calendar support**: both professor and student calendars depend on the `calendar_events` and `interview_requests` tables being created in Supabase.
+- **Storage**: uploaded course files are stored in `course-materials`; assignment PDFs are stored in `submissions`.
+
+---
+
+## Suggested Demo Flow
+
+If you are presenting this project, a good end-to-end flow is:
+1. Professor creates a course from syllabus upload.
+2. Professor uploads materials and creates a quiz or assignment request.
+3. Student enrolls, opens the course, chats with the AI tutor, and submits work.
+4. Student checks `To Do`, `My Progress`, and `Calendar`.
+5. Professor opens `Flagged Questions`, `Analytics`, and `Calendar` to review insights and requests.
 
 ---
 
