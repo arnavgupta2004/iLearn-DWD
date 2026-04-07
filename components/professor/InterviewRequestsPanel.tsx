@@ -22,10 +22,11 @@ interface Props {
 export default function InterviewRequestsPanel({ requests }: Props) {
   const router = useRouter();
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [note, setNote] = useState("");
+  const [notesById, setNotesById] = useState<Record<string, string>>({});
 
   async function respond(id: string, status: "approved" | "declined") {
     setBusyId(id);
+    const note = notesById[id]?.trim() ?? "";
     try {
       const res = await fetch("/api/calendar/interviews/respond", {
         method: "POST",
@@ -38,7 +39,7 @@ export default function InterviewRequestsPanel({ requests }: Props) {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Failed to update request");
-      setNote("");
+      setNotesById((current) => ({ ...current, [id]: "" }));
       router.refresh();
     } catch (err) {
       console.error(err);
@@ -109,8 +110,13 @@ export default function InterviewRequestsPanel({ requests }: Props) {
               {request.status === "pending" && (
                 <div className="mt-3">
                   <input
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
+                    value={notesById[request.id] ?? ""}
+                    onChange={(e) =>
+                      setNotesById((current) => ({
+                        ...current,
+                        [request.id]: e.target.value,
+                      }))
+                    }
                     placeholder="Optional note to student..."
                     className="w-full px-3 py-2 rounded-xl border text-sm outline-none mb-2"
                     style={{ borderColor: "#dde3f0", background: "#fafbff" }}

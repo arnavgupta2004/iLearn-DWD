@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { localDateTimeToIso } from "@/lib/calendar";
 
 interface CourseOption {
   id: string;
@@ -35,17 +36,22 @@ export default function RequestInterviewDialog({ courses }: Props) {
 
     setLoading(true);
     try {
-      const course = courses.find((item) => item.id === courseId);
+      const preferredStartIso = localDateTimeToIso(preferredStart);
+      const preferredEndIso = preferredEnd ? localDateTimeToIso(preferredEnd) : null;
+
+      if (preferredEndIso && new Date(preferredEndIso).getTime() < new Date(preferredStartIso).getTime()) {
+        throw new Error("Preferred end time must be after the start time.");
+      }
+
       const res = await fetch("/api/calendar/interviews/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           courseId,
-          profId: course?.prof_id,
           title: title.trim(),
           agenda: agenda.trim(),
-          preferredStart,
-          preferredEnd: preferredEnd || null,
+          preferredStart: preferredStartIso,
+          preferredEnd: preferredEndIso,
         }),
       });
       const json = await res.json();

@@ -21,6 +21,27 @@ export interface CalendarEventItem {
   status?: string | null;
 }
 
+function pad(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+export function localDateTimeToIso(value: string) {
+  if (!value) return value;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error("Invalid date/time");
+  }
+
+  return date.toISOString();
+}
+
+export function formatDateKey(dateInput: string) {
+  const date = new Date(dateInput);
+
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 export function eventTypeLabel(type: CalendarEventType) {
   switch (type) {
     case "class":
@@ -87,7 +108,7 @@ export function groupEventsByDay(events: CalendarEventItem[]) {
   );
 
   for (const event of sorted) {
-    const key = new Date(event.startAt).toISOString().slice(0, 10);
+    const key = formatDateKey(event.startAt);
     if (!grouped.has(key)) grouped.set(key, []);
     grouped.get(key)!.push(event);
   }

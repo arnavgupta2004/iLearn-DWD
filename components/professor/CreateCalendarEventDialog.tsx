@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { localDateTimeToIso } from "@/lib/calendar";
 
 interface CourseOption {
   id: string;
@@ -35,6 +36,13 @@ export default function CreateCalendarEventDialog({ courses }: Props) {
 
     setLoading(true);
     try {
+      const startAtIso = localDateTimeToIso(startAt);
+      const endAtIso = endAt ? localDateTimeToIso(endAt) : null;
+
+      if (endAtIso && new Date(endAtIso).getTime() < new Date(startAtIso).getTime()) {
+        throw new Error("End time must be after the start time.");
+      }
+
       const res = await fetch("/api/calendar/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -43,8 +51,8 @@ export default function CreateCalendarEventDialog({ courses }: Props) {
           description: description.trim() || null,
           eventType,
           courseId: courseId || null,
-          startAt,
-          endAt: endAt || null,
+          startAt: startAtIso,
+          endAt: endAtIso,
           location: location.trim() || null,
         }),
       });
