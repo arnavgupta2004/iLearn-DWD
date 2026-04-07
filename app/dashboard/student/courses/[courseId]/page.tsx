@@ -4,6 +4,7 @@ import { redirect, notFound } from "next/navigation";
 import ChatInterface from "@/components/student/ChatInterface";
 import CourseInfoPanel from "@/components/student/CourseInfoPanel";
 import StudentAssessmentsSection from "@/components/student/StudentAssessmentsSection";
+import StudyBuddiesSection from "@/components/student/StudyBuddiesSection";
 
 interface Props {
   params: Promise<{ courseId: string }>;
@@ -136,6 +137,7 @@ export default async function StudentCourseDetailPage({ params }: Props) {
             courseId={courseId}
           />
         </div>
+        <StudyBuddiesSection courseId={courseId} studentId={user.id} />
       </div>
     </div>
   );
