@@ -27,7 +27,6 @@ interface Submission {
 interface Props {
   assessments: Assessment[];
   submissions: Submission[];
-  studentId: string;
   courseId: string;
 }
 
@@ -42,7 +41,6 @@ function formatDue(d: string | null) {
 export default function StudentAssessmentsSection({
   assessments,
   submissions,
-  studentId,
   courseId,
 }: Props) {
   const router = useRouter();
@@ -55,7 +53,7 @@ export default function StudentAssessmentsSection({
       const res = await fetch("/api/assessments/micro", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ courseId, studentId }),
+        body: JSON.stringify({ courseId }),
       });
       if (res.ok) {
         router.refresh();
@@ -193,8 +191,6 @@ export default function StudentAssessmentsSection({
       {activeAssessment && (
         <TakeAssessmentDialog
           assessment={activeAssessment}
-          studentId={studentId}
-          courseId={courseId}
           onClose={() => setActiveAssessment(null)}
           onSubmitted={() => {
             setActiveAssessment(null);

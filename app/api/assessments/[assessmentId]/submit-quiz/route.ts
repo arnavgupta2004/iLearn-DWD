@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase-server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { geminiFlash } from "@/lib/gemini";
 import { tagStruggleTopic } from "@/lib/struggle-tracker";
@@ -63,19 +64,61 @@ export async function POST(
 ) {
   const { assessmentId } = await params;
   try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await req.json();
-    const { studentId, courseId, answers } = body as {
-      studentId: string;
-      courseId: string;
+    const { answers } = body as {
       answers: Record<string, string>;
     };
+
+    if (!answers || typeof answers !== "object") {
+      return NextResponse.json({ error: "Answers are required." }, { status: 400 });
+    }
+
+    const { data: assessment, error: assessmentError } = await supabaseAdmin
+      .from("assessments")
+      .select("course_id, total_marks, type")
+      .eq("id", assessmentId)
+      .maybeSingle();
+
+    if (assessmentError) {
+      return NextResponse.json({ error: assessmentError.message }, { status: 500 });
+    }
+
+    if (!assessment || assessment.type !== "quiz") {
+      return NextResponse.json({ error: "Quiz not found." }, { status: 404 });
+    }
+
+    const courseId = assessment.course_id;
+
+    const { data: enrollment, error: enrollmentError } = await supabase
+      .from("enrollments")
+      .select("id")
+      .eq("student_id", user.id)
+      .eq("course_id", courseId)
+      .maybeSingle();
+
+    if (enrollmentError) {
+      return NextResponse.json({ error: enrollmentError.message }, { status: 500 });
+    }
+
+    if (!enrollment) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     // 0. Guard: prevent duplicate submissions
     const { data: existing } = await supabaseAdmin
       .from("assessment_submissions")
       .select("id")
       .eq("assessment_id", assessmentId)
-      .eq("student_id", studentId)
+      .eq("student_id", user.id)
       .maybeSingle();
 
     if (existing) {
@@ -95,12 +138,6 @@ export async function POST(
     if (qErr || !questions) {
       return NextResponse.json({ error: "Failed to fetch questions" }, { status: 500 });
     }
-
-    const { data: assessment } = await supabaseAdmin
-      .from("assessments")
-      .select("total_marks")
-      .eq("id", assessmentId)
-      .single();
 
     // 2. Evaluate each question
     let totalEarned = 0;
@@ -162,7 +199,7 @@ export async function POST(
       (sum, q) => sum + q.marks,
       0
     );
-    const totalMaxMarks = assessment?.total_marks ?? totalMaxFromQuestions;
+    const totalMaxMarks = assessment.total_marks ?? totalMaxFromQuestions;
     const finalScore =
       totalMaxFromQuestions > 0
         ? Math.round((totalEarned / totalMaxFromQuestions) * totalMaxMarks)
@@ -184,7 +221,7 @@ export async function POST(
       .from("assessment_submissions")
       .insert({
         assessment_id: assessmentId,
-        student_id: studentId,
+        student_id: user.id,
         course_id: courseId,
         type: "quiz",
         answers,
@@ -225,7 +262,7 @@ export async function POST(
     void (async () => {
       for (const item of breakdown) {
         if (item.earned < item.max) {
-          await tagStruggleTopic(courseId, studentId, item.question_text);
+          await tagStruggleTopic(courseId, user.id, item.question_text);
         }
       }
     })();

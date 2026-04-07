@@ -30,7 +30,6 @@ interface Assessment {
 interface Props {
   pending: Assessment[];
   completed: Assessment[];
-  studentId: string;
 }
 
 function getUrgency(due_date: string | null): "overdue" | "today" | "soon" | "upcoming" | "none" {
@@ -87,7 +86,7 @@ function formatFullDate(due_date: string | null) {
   });
 }
 
-export default function TodoClient({ pending, completed, studentId }: Props) {
+export default function TodoClient({ pending, completed }: Props) {
   const router = useRouter();
   const [activeAssessment, setActiveAssessment] = useState<Assessment | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
@@ -322,8 +321,6 @@ export default function TodoClient({ pending, completed, studentId }: Props) {
       {activeAssessment && (
         <TakeAssessmentDialog
           assessment={activeAssessment}
-          studentId={studentId}
-          courseId={activeAssessment.course_id}
           onClose={() => setActiveAssessment(null)}
           onSubmitted={() => {
             setActiveAssessment(null);

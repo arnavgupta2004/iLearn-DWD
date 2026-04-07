@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase-server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { geminiFlash } from "@/lib/gemini";
 import { tagStruggleTopic } from "@/lib/struggle-tracker";
@@ -12,16 +13,54 @@ export async function POST(
 ) {
   const { assessmentId } = await params;
   try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
-    const studentId = formData.get("studentId") as string;
-    const courseId = formData.get("courseId") as string;
 
-    if (!file || !studentId || !courseId) {
+    if (!file) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
     if (file.type !== "application/pdf") {
       return NextResponse.json({ error: "Please upload a PDF file." }, { status: 400 });
+    }
+
+    const { data: assessment, error: assessmentError } = await supabaseAdmin
+      .from("assessments")
+      .select("course_id, title, description, total_marks, type")
+      .eq("id", assessmentId)
+      .maybeSingle();
+
+    if (assessmentError) {
+      return NextResponse.json({ error: assessmentError.message }, { status: 500 });
+    }
+
+    if (!assessment || assessment.type !== "assignment") {
+      return NextResponse.json({ error: "Assignment not found." }, { status: 404 });
+    }
+
+    const courseId = assessment.course_id;
+
+    const { data: enrollment, error: enrollmentError } = await supabase
+      .from("enrollments")
+      .select("id")
+      .eq("student_id", user.id)
+      .eq("course_id", courseId)
+      .maybeSingle();
+
+    if (enrollmentError) {
+      return NextResponse.json({ error: enrollmentError.message }, { status: 500 });
+    }
+
+    if (!enrollment) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     // Guard: prevent duplicate submissions
@@ -29,7 +68,7 @@ export async function POST(
       .from("assessment_submissions")
       .select("id")
       .eq("assessment_id", assessmentId)
-      .eq("student_id", studentId)
+      .eq("student_id", user.id)
       .maybeSingle();
 
     if (existing) {
@@ -56,7 +95,7 @@ export async function POST(
     }
 
     // 2. Upload file to storage
-    const filePath = `assessments/${assessmentId}/${studentId}/${Date.now()}-${file.name}`;
+    const filePath = `assessments/${assessmentId}/${user.id}/${Date.now()}-${file.name}`;
     const buffer = Buffer.from(await file.arrayBuffer());
     const { error: uploadErr } = await supabaseAdmin.storage
       .from(BUCKET)
@@ -66,14 +105,7 @@ export async function POST(
       return NextResponse.json({ error: uploadErr.message }, { status: 500 });
     }
 
-    // 3. Fetch assessment details
-    const { data: assessment } = await supabaseAdmin
-      .from("assessments")
-      .select("title, description, total_marks")
-      .eq("id", assessmentId)
-      .single();
-
-    const totalMarks = assessment?.total_marks ?? 100;
+    const totalMarks = assessment.total_marks ?? 100;
 
     // 4. Parse PDF
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -122,7 +154,7 @@ ${submissionText.slice(0, 10000)}`;
       .from("assessment_submissions")
       .insert({
         assessment_id: assessmentId,
-        student_id: studentId,
+        student_id: user.id,
         course_id: courseId,
         type: "assignment",
         file_path: filePath,
@@ -178,7 +210,7 @@ ${submissionText.slice(0, 10000)}`;
     // Tag struggle topics from mistakes (non-blocking)
     void (async () => {
       for (const mistake of (evaluation.mistakes ?? []).slice(0, 5)) {
-        await tagStruggleTopic(courseId, studentId, mistake);
+        await tagStruggleTopic(courseId, user.id, mistake);
       }
     })();
 

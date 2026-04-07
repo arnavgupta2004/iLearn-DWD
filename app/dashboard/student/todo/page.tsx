@@ -88,7 +88,6 @@ export default async function TodoPage() {
       <TodoClient
         pending={pending}
         completed={completed}
-        studentId={user.id}
       />
       <PageChatbot
         scope="student_todo"

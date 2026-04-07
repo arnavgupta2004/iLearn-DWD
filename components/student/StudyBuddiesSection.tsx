@@ -10,7 +10,7 @@ interface Match {
   youCanHelpThemWith: string;
 }
 
-export default function StudyBuddiesSection({ courseId, studentId }: { courseId: string; studentId: string }) {
+export default function StudyBuddiesSection({ courseId }: { courseId: string }) {
   const [matches, setMatches] = useState<Match[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -18,7 +18,7 @@ export default function StudyBuddiesSection({ courseId, studentId }: { courseId:
     fetch("/api/study-match", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ courseId, studentId }),
+      body: JSON.stringify({ courseId }),
     })
       .then((r) => r.json())
       .then((data) => {
@@ -29,7 +29,7 @@ export default function StudyBuddiesSection({ courseId, studentId }: { courseId:
         console.error(err);
         setLoading(false);
       });
-  }, [courseId, studentId]);
+  }, [courseId]);
 
   if (loading || matches.length === 0) return null;
 

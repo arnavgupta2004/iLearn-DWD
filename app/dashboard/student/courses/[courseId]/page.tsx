@@ -112,7 +112,6 @@ export default async function StudentCourseDetailPage({ params }: Props) {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <ChatInterface
           courseId={courseId}
-          studentId={user.id}
           courseName={course.name}
           difficultyLevel={course.difficulty_level ?? "undergraduate"}
           history={chatHistory}
@@ -133,11 +132,10 @@ export default async function StudentCourseDetailPage({ params }: Props) {
           <StudentAssessmentsSection
             assessments={assessments}
             submissions={myAssessmentSubs}
-            studentId={user.id}
             courseId={courseId}
           />
         </div>
-        <StudyBuddiesSection courseId={courseId} studentId={user.id} />
+        <StudyBuddiesSection courseId={courseId} />
       </div>
     </div>
   );

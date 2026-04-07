@@ -13,7 +13,6 @@ interface ChatMessage {
 
 interface Props {
   courseId: string;
-  studentId: string;
   courseName: string;
   difficultyLevel: string;
   history: ChatMessage[];
@@ -115,7 +114,6 @@ function MessageBubble({
 
 export default function ChatInterface({
   courseId,
-  studentId,
   courseName,
   difficultyLevel,
   history,
@@ -180,7 +178,6 @@ export default function ChatInterface({
         body: JSON.stringify({
           messages: historyToSend,
           courseId,
-          studentId,
           courseName,
           difficultyLevel,
         }),
@@ -225,7 +222,7 @@ export default function ChatInterface({
       setIsStreaming(false);
       setStreamingId(null);
     }
-  }, [input, isStreaming, messages, courseId, studentId, courseName, difficultyLevel]);
+  }, [input, isStreaming, messages, courseId, courseName, difficultyLevel]);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {

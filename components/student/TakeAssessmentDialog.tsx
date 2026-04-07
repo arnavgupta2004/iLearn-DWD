@@ -47,13 +47,11 @@ interface Assessment {
 
 interface Props {
   assessment: Assessment;
-  studentId: string;
-  courseId: string;
   onClose: () => void;
   onSubmitted?: () => void;
 }
 
-export default function TakeAssessmentDialog({ assessment, studentId, courseId, onClose, onSubmitted }: Props) {
+export default function TakeAssessmentDialog({ assessment, onClose, onSubmitted }: Props) {
   const [phase, setPhase] = useState<"loading" | "quiz" | "assignment" | "submitting" | "result" | "error">(
     assessment.type === "quiz" ? "loading" : "assignment"
   );
@@ -86,7 +84,7 @@ export default function TakeAssessmentDialog({ assessment, studentId, courseId, 
       const res = await fetch(`/api/assessments/${assessment.id}/submit-quiz`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ studentId, courseId, answers }),
+        body: JSON.stringify({ answers }),
       });
       const data = await res.json();
       if (!res.ok) { setErrorMsg(data.error ?? "Submission failed."); setPhase("error"); return; }
@@ -105,8 +103,6 @@ export default function TakeAssessmentDialog({ assessment, studentId, courseId, 
     try {
       const form = new FormData();
       form.append("file", file);
-      form.append("studentId", studentId);
-      form.append("courseId", courseId);
       const res = await fetch(`/api/assessments/${assessment.id}/submit-assignment`, {
         method: "POST",
         body: form,

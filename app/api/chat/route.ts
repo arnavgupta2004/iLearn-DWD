@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { streamText } from "ai";
 import { createGroq } from "@ai-sdk/groq";
+import { createClient } from "@/lib/supabase-server";
 import { retrieveContext, retrieveAllChunks } from "@/lib/rag";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { tagStruggleTopic } from "@/lib/struggle-tracker";
@@ -62,15 +63,52 @@ ${context.trim() || "No course materials have been indexed for this course yet."
 // ── Route ───────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
   const body = await req.json();
-  const { messages, courseId, studentId, courseName, difficultyLevel } =
+  const { messages, courseId, courseName, difficultyLevel } =
     body as {
       messages: { role: "user" | "assistant"; content: string }[];
       courseId: string;
-      studentId: string;
       courseName: string;
       difficultyLevel: string;
     };
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (profileError) {
+    return new Response(profileError.message, { status: 500 });
+  }
+
+  if (profile?.role !== "student") {
+    return new Response("Forbidden", { status: 403 });
+  }
+
+  const { data: enrollment, error: enrollmentError } = await supabase
+    .from("enrollments")
+    .select("id")
+    .eq("student_id", user.id)
+    .eq("course_id", courseId)
+    .maybeSingle();
+
+  if (enrollmentError) {
+    return new Response(enrollmentError.message, { status: 500 });
+  }
+
+  if (!enrollment) {
+    return new Response("Forbidden", { status: 403 });
+  }
 
   const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
   if (!lastUserMsg) {
@@ -136,7 +174,7 @@ export async function POST(req: NextRequest) {
         // Save user message
         await supabaseAdmin.from("chat_messages").insert({
           course_id: courseId,
-          student_id: studentId,
+          student_id: user.id,
           role: "user",
           content: lastUserMsg.content,
           flagged_for_prof: false,
@@ -145,7 +183,7 @@ export async function POST(req: NextRequest) {
         // Save assistant message
         await supabaseAdmin.from("chat_messages").insert({
           course_id: courseId,
-          student_id: studentId,
+          student_id: user.id,
           role: "assistant",
           content: text,
           flagged_for_prof: flagged,
@@ -154,14 +192,14 @@ export async function POST(req: NextRequest) {
         if (flagged) {
           await supabaseAdmin.from("flagged_questions").insert({
             course_id: courseId,
-            student_id: studentId,
+            student_id: user.id,
             question: lastUserMsg.content,
             ai_response: text,
           });
         }
 
         // Background topic tagging (non-blocking)
-        void tagStruggleTopic(courseId, studentId, lastUserMsg.content);
+        void tagStruggleTopic(courseId, user.id, lastUserMsg.content);
 
         resolveFinish(flagged);
       } catch (e) {

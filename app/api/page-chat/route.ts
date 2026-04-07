@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { geminiFlash } from "@/lib/gemini";
+import { createClient } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -30,6 +31,15 @@ function buildScopeRules(scope: string) {
 
 export async function POST(req: NextRequest) {
   try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = (await req.json()) as {
       scope: string;
       pageTitle: string;
@@ -40,8 +50,26 @@ export async function POST(req: NextRequest) {
 
     const { scope, pageTitle, instructions, context, messages } = body;
 
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      return NextResponse.json({ error: profileError.message }, { status: 500 });
+    }
+
     if (!scope || !pageTitle || !Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    if (scope.startsWith("student_") && profile?.role !== "student") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    if (scope.startsWith("prof_") && profile?.role !== "professor") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const contextText = JSON.stringify(context).slice(0, 18000);
