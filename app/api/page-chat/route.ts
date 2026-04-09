@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { geminiFlash } from "@/lib/gemini";
+import { groq, CHAT_MODEL } from "@/lib/groq";
 import { createClient } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
@@ -99,8 +99,27 @@ ${chatHistory}
 
 Answer the latest USER message only.`;
 
-    const result = await geminiFlash.generateContent(prompt);
-    const answer = result.response.text().trim();
+    const result = await groq.chat.completions.create({
+      model: CHAT_MODEL,
+      temperature: 0.3,
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are a page-specific academic assistant. Follow the provided scope strictly and answer only from the supplied context.",
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+    });
+
+    const answer = result.choices[0]?.message?.content?.trim();
+
+    if (!answer) {
+      throw new Error("Groq returned an empty response.");
+    }
 
     return NextResponse.json({ answer });
   } catch (error) {
