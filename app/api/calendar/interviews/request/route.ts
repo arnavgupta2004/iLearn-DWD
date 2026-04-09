@@ -3,6 +3,22 @@ import { createClient } from "@/lib/supabase-server";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 import { localDateTimeToIso } from "@/lib/calendar";
 
+function normalizeDateTime(value: string | null | undefined) {
+  if (!value) return null;
+
+  // If the client already sent an ISO timestamp, keep it as-is.
+  const isoLike = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value);
+  if (isoLike) {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new Error("Invalid date/time");
+    }
+    return parsed.toISOString();
+  }
+
+  return localDateTimeToIso(value);
+}
+
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const {
@@ -38,7 +54,7 @@ export async function POST(req: NextRequest) {
 
     const { data: enrollment, error: enrollmentError } = await supabase
       .from("enrollments")
-      .select("course_id, courses!inner(id, prof_id)")
+      .select("course_id")
       .eq("student_id", user.id)
       .eq("course_id", body.courseId)
       .maybeSingle();
@@ -47,21 +63,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: enrollmentError.message }, { status: 500 });
     }
 
-    const course = Array.isArray(enrollment?.courses) ? enrollment.courses[0] : enrollment?.courses;
-
-    if (!enrollment || !course?.prof_id) {
+    if (!enrollment) {
       return NextResponse.json(
         { error: "You can only request interviews for courses you are enrolled in." },
         { status: 403 }
       );
     }
 
+    const { data: course, error: courseError } = await supabase
+      .from("courses")
+      .select("id, prof_id")
+      .eq("id", body.courseId)
+      .maybeSingle();
+
+    if (courseError) {
+      return NextResponse.json({ error: courseError.message }, { status: 500 });
+    }
+
+    if (!course?.prof_id) {
+      return NextResponse.json({ error: "Course professor could not be determined." }, { status: 400 });
+    }
+
     let preferredStartIso: string;
     let preferredEndIso: string | null = null;
 
     try {
-      preferredStartIso = localDateTimeToIso(body.preferredStart);
-      preferredEndIso = body.preferredEnd ? localDateTimeToIso(body.preferredEnd) : null;
+      preferredStartIso = normalizeDateTime(body.preferredStart) ?? "";
+      preferredEndIso = normalizeDateTime(body.preferredEnd);
     } catch {
       return NextResponse.json({ error: "Invalid interview date/time." }, { status: 400 });
     }
